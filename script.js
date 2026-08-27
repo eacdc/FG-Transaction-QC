@@ -491,6 +491,26 @@
     const grouped = groupItems();
     const flags = liveFlags();
 
+    /*
+     * No characteristics means the parameter master has nothing for this
+     * category — there is no sheet to fill. The form used to render an empty
+     * space with a live Submit button under it, which reads as "no defects
+     * found" rather than "nothing was loaded". Say which it is.
+     */
+    if (!(state.template?.items || []).length) {
+      els.formSections.innerHTML =
+        '<article class="severity-block is-unclassified">'
+        + '<header class="severity-head is-over"><span>No inspection sheet</span>'
+        + '<span>0 characteristics</span></header>'
+        + '<p class="severity-note">No defect characteristics are set up for this'
+        + ' product category, so there is nothing to count. This is a setup gap, not'
+        + ' a clean lot — ask the QC in-charge to add the characteristics to the'
+        + ' parameter master, then reopen this lot.</p>'
+        + '</article>';
+      updateLiveFlags();
+      return;
+    }
+
     els.formSections.innerHTML = SEVERITY_ORDER.map((sev) => {
       const rows = grouped[sev];
       if (!rows.length) return '';
@@ -596,6 +616,11 @@
   }
 
   function clientValidate() {
+    if (!(state.template?.items || []).length) {
+      return 'There is no inspection sheet for this product category — no defect'
+        + ' characteristics are set up on the parameter master. Nothing can be'
+        + ' recorded against this lot until they are added.';
+    }
     const sample = Math.trunc(Number(els.sampleSize.value) || 0);
     const lotSize = Number(state.template?.lotSize);
     if (sample <= 0) return 'Cartons inspected must be greater than zero.';
