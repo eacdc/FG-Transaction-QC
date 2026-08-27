@@ -404,11 +404,15 @@
     els.formSeverityBanner.hidden = unresolved === 0;
     els.formSeverityBanner.textContent = unresolved === 0
       ? ''
-      : unresolved + ' characteristic' + (unresolved === 1 ? '' : 's')
-        + ' on this sheet have no severity on the master, so there is no way to tell'
-        + ' which AQL class they belong to. They are listed at the bottom and are not'
-        + ' counted. Leave them at zero to submit, and ask the QC in-charge to set'
-        + ' their severity.';
+      : (unresolved === 1
+        ? '1 characteristic on this sheet has no severity on the master, so there is no'
+          + ' way to tell which AQL class it belongs to. It is listed at the bottom and'
+          + ' is not counted. Leave it at zero to submit, and ask the QC in-charge to'
+          + ' set its severity.'
+        : unresolved + ' characteristics on this sheet have no severity on the master, so'
+          + ' there is no way to tell which AQL class they belong to. They are listed at'
+          + ' the bottom and are not counted. Leave them at zero to submit, and ask the'
+          + ' QC in-charge to set their severity.');
   }
 
   function renderFormHeader() {
