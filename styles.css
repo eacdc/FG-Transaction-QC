@@ -19,11 +19,18 @@
   --info-bg: #1b2e3a;
   --pending: #c4a6e0;
   --pending-bg: #2d2340;
-  --tap: 52px;
-  --radius: 12px;
-  --shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+  /*
+   * --tap is the gloved-hand target and stays large: it sizes the count
+   * steppers, which spec section 9 calls the centre of the product. --tap-sm
+   * is for navigation chrome — filters, tabs, pagers — where a smaller
+   * control costs nothing because nobody is tapping it mid-count.
+   */
+  --tap: 48px;
+  --tap-sm: 36px;
+  --radius: 10px;
+  --shadow: 0 8px 22px rgba(0, 0, 0, 0.35);
   font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
-  font-size: 18px;
+  font-size: 15px;
 }
 
 * { box-sizing: border-box; }
@@ -42,67 +49,68 @@ body {
 }
 
 .app {
-  width: min(1400px, calc(100vw - 20px));
+  width: min(1500px, calc(100vw - 16px));
   margin: 0 auto;
-  padding: 12px 0 40px;
+  padding: 10px 0 28px;
 }
 
 .topbar {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px 20px;
+  gap: 8px 16px;
   align-items: flex-end;
   justify-content: space-between;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .topbar-title {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   align-items: center;
 }
 
 .btn-home {
-  width: 52px;
-  height: 52px;
+  width: 38px;
+  height: 38px;
+  min-height: 0;
   border: 0;
-  border-radius: 14px;
+  border-radius: 10px;
   background: var(--accent);
   color: #1a1404;
   font-weight: 800;
-  font-size: 1.05rem;
+  font-size: 0.9rem;
   cursor: pointer;
 }
 
 .topbar h1 {
   margin: 0;
-  font-size: clamp(1.35rem, 2vw + 1rem, 1.85rem);
+  font-size: clamp(1.15rem, 1.4vw + 0.8rem, 1.45rem);
   letter-spacing: 0.01em;
 }
 
 .topbar p {
-  margin: 4px 0 0;
+  margin: 2px 0 0;
   color: var(--muted);
-  font-size: 0.92rem;
+  font-size: 0.85rem;
 }
 
 .topbar-controls, .toolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   align-items: end;
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  font-size: 0.82rem;
+  gap: 3px;
+  font-size: 0.76rem;
   color: var(--muted);
-  min-width: 140px;
+  min-width: 118px;
 }
 
-.field.grow { flex: 1; min-width: 220px; }
+.field.grow { flex: 1; min-width: 180px; }
 
 input, select, textarea, button {
   font: inherit;
@@ -110,23 +118,23 @@ input, select, textarea, button {
 }
 
 input, select, textarea {
-  min-height: var(--tap);
+  min-height: var(--tap-sm);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 8px;
   background: #0f131c;
-  padding: 0 12px;
+  padding: 0 10px;
 }
 
 textarea {
-  min-height: 96px;
-  padding: 12px;
+  min-height: 64px;
+  padding: 8px 10px;
   resize: vertical;
 }
 
 button {
-  min-height: var(--tap);
-  padding: 0 18px;
-  border-radius: 10px;
+  min-height: var(--tap-sm);
+  padding: 0 14px;
+  border-radius: 8px;
   border: 1px solid transparent;
   cursor: pointer;
   font-weight: 650;
@@ -148,15 +156,17 @@ button:disabled {
   color: var(--text);
 }
 
+/* The one control the inspector reaches for with gloves on. */
 .btn-submit {
-  min-width: 220px;
-  font-size: 1.1rem;
+  min-width: 190px;
+  min-height: var(--tap);
+  font-size: 1.05rem;
 }
 
 .tabs {
   display: flex;
-  gap: 8px;
-  margin: 14px 0 12px;
+  gap: 6px;
+  margin: 10px 0 8px;
 }
 
 .tab {
@@ -173,7 +183,7 @@ button:disabled {
 
 .global-status, .meta-line, .panel-sub, .sample-hint, .plan-unit-note {
   color: var(--muted);
-  font-size: 0.92rem;
+  font-size: 0.82rem;
 }
 
 .global-status.is-error { color: var(--bad); }
@@ -189,20 +199,20 @@ button:disabled {
 .data-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 980px;
+  min-width: 900px;
 }
 
 .data-table th, .data-table td {
-  padding: 12px 10px;
+  padding: 6px 9px;
   text-align: left;
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
 }
 
 .data-table th {
-  font-size: 0.78rem;
+  font-size: 0.7rem;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
   color: var(--muted);
   background: #191e29;
   position: sticky;
@@ -218,7 +228,7 @@ button:disabled {
 }
 
 .data-table .num { text-align: right; font-variant-numeric: tabular-nums; }
-.data-table .empty { text-align: center; color: var(--muted); padding: 36px 12px; }
+.data-table .empty { text-align: center; color: var(--muted); padding: 20px 12px; }
 
 .data-table tbody tr:hover { background: rgba(212, 160, 23, 0.06); }
 
@@ -229,18 +239,18 @@ button:disabled {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 32px;
-  padding: 4px 10px;
+  min-height: 22px;
+  padding: 1px 8px;
   border-radius: 999px;
   font-weight: 700;
-  font-size: 0.86rem;
+  font-size: 0.75rem;
   border: 1px solid transparent;
 }
 
 .status-pill::before {
   content: "";
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: currentColor;
 }
@@ -256,40 +266,40 @@ button:disabled {
   gap: 10px;
   align-items: center;
   justify-content: center;
-  margin-top: 12px;
+  margin-top: 10px;
 }
 
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 10px;
-  margin: 12px 0 16px;
+  grid-template-columns: repeat(auto-fit, minmax(142px, 1fr));
+  gap: 8px;
+  margin: 8px 0 12px;
 }
 
 .kpi {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 14px;
+  padding: 9px 10px;
   text-align: left;
   cursor: pointer;
   color: inherit;
-  min-height: 110px;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .kpi.is-active { outline: 2px solid var(--accent); }
-.kpi .kpi-label { color: var(--muted); font-size: 0.82rem; }
-.kpi .kpi-value { font-size: 2rem; font-weight: 800; line-height: 1.1; }
-.kpi .kpi-sub { color: var(--muted); font-size: 0.8rem; }
+.kpi .kpi-label { color: var(--muted); font-size: 0.74rem; }
+.kpi .kpi-value { font-size: 1.5rem; font-weight: 800; line-height: 1.15; }
+.kpi .kpi-sub { color: var(--muted); font-size: 0.7rem; }
 
 .charts-grid {
   display: grid;
   grid-template-columns: 1.4fr 1fr;
-  gap: 12px;
-  margin-bottom: 14px;
+  gap: 10px;
+  margin-bottom: 10px;
 }
 
 .chart-panel-wide { grid-column: 1 / -1; }
@@ -298,25 +308,25 @@ button:disabled {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 14px;
-  margin-bottom: 12px;
+  padding: 11px 12px;
+  margin-bottom: 10px;
 }
 
-.panel h2 { margin: 0 0 6px; font-size: 1.1rem; }
+.panel h2 { margin: 0 0 4px; font-size: 0.98rem; }
 
-.chart-body { min-height: 120px; }
+.chart-body { min-height: 56px; }
 
 .bar-row {
   display: grid;
-  grid-template-columns: minmax(120px, 260px) 1fr 64px;
+  grid-template-columns: minmax(110px, 240px) 1fr 58px;
   gap: 8px;
   align-items: center;
-  margin: 8px 0;
-  font-size: 0.92rem;
+  margin: 5px 0;
+  font-size: 0.82rem;
 }
 
 .bar-track {
-  height: 18px;
+  height: 13px;
   background: #0f131c;
   border-radius: 999px;
   overflow: hidden;
@@ -332,9 +342,10 @@ button:disabled {
 
 .banner {
   border-radius: var(--radius);
-  padding: 12px 14px;
-  margin-bottom: 10px;
+  padding: 8px 11px;
+  margin-bottom: 8px;
   font-weight: 650;
+  font-size: 0.88rem;
 }
 
 .banner-reject { background: var(--bad-bg); color: #ffd0c8; border: 1px solid var(--bad); }
@@ -344,80 +355,98 @@ button:disabled {
 .plan-band {
   background: linear-gradient(180deg, #2a2416, #1d1a12);
   border: 2px solid var(--accent);
-  border-radius: 16px;
-  padding: 16px 18px;
-  margin-bottom: 14px;
+  border-radius: 13px;
+  padding: 11px 14px;
+  margin-bottom: 10px;
 }
 
+/*
+ * The base font dropped from 18px to 15px when the page was compacted, so
+ * these rem values are scaled up to hold the same pixel size. Spec section 9:
+ * the plan band and the entry grid carry the largest text on the screen,
+ * readable at arm's length. Tightening the layout must not shrink them.
+ */
 .plan-line {
   margin: 0;
-  font-size: clamp(1.4rem, 2.4vw + 1rem, 2.1rem);
+  font-size: clamp(1.7rem, 2.2vw + 1.1rem, 2.4rem);
   font-weight: 800;
   letter-spacing: 0.01em;
 }
 
 .plan-accept {
-  margin: 8px 0 0;
-  font-size: clamp(1.15rem, 1.6vw + 0.9rem, 1.55rem);
+  margin: 5px 0 0;
+  font-size: clamp(1.4rem, 1.5vw + 1rem, 1.85rem);
   font-weight: 700;
 }
 
-.plan-unit-note { margin: 8px 0 0; }
+.plan-unit-note { margin: 5px 0 0; }
 
 .form-header {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 8px 12px;
-  margin-bottom: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 6px 8px;
+  margin-bottom: 10px;
 }
 
 .kv {
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 12px;
+  border-radius: 8px;
+  padding: 6px 9px;
 }
 
-.kv dt { margin: 0; color: var(--muted); font-size: 0.75rem; text-transform: uppercase; }
-.kv dd { margin: 4px 0 0; font-weight: 700; font-size: 1.05rem; }
+.kv dt { margin: 0; color: var(--muted); font-size: 0.68rem; text-transform: uppercase; }
+.kv dd { margin: 2px 0 0; font-weight: 700; font-size: 0.95rem; }
 
 .sample-row {
   display: grid;
-  grid-template-columns: minmax(280px, 360px) 1fr;
-  gap: 14px;
+  grid-template-columns: minmax(260px, 330px) 1fr;
+  gap: 10px;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
-.sample-field span { font-size: 0.95rem; color: var(--text); font-weight: 700; }
+.sample-field span { font-size: 0.9rem; color: var(--text); font-weight: 700; }
 
+/* Entry grid — gloved hand, arm's length. Deliberately not compacted. */
 .stepper {
   display: grid;
-  grid-template-columns: var(--tap) 1fr var(--tap);
-  gap: 8px;
+  grid-template-columns: var(--tap) minmax(0, 1fr) var(--tap);
+  gap: 6px;
   align-items: center;
+  min-width: 0;
 }
 
 .stepper-btn {
   min-width: var(--tap);
+  min-height: var(--tap);
   background: var(--panel-2);
   border-color: var(--border);
-  font-size: 1.6rem;
+  font-size: 1.75rem;
   line-height: 1;
 }
 
 #sample-size, .count-input {
+  min-height: var(--tap);
+  /*
+   * A grid 1fr track resolves its minimum to the item's min-content, and for
+   * an <input> that is its default ~20-character size. At this font that
+   * overflowed the stepper's column and pushed the + button out from under
+   * the inspector's thumb. min-width: 0 lets the track actually shrink.
+   */
+  min-width: 0;
+  width: 100%;
   text-align: center;
-  font-size: 1.55rem;
+  font-size: 1.85rem;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
 
-.form-sections { display: flex; flex-direction: column; gap: 14px; }
+.form-sections { display: flex; flex-direction: column; gap: 10px; }
 
 .severity-block {
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: 11px;
   overflow: hidden;
   background: var(--panel);
 }
@@ -427,10 +456,10 @@ button:disabled {
   justify-content: space-between;
   gap: 10px;
   align-items: baseline;
-  padding: 12px 14px;
+  padding: 7px 12px;
   background: var(--panel-2);
   font-weight: 800;
-  font-size: 1.15rem;
+  font-size: 1.1rem;
 }
 
 .severity-head.is-limit { background: var(--warn-bg); color: var(--warn); }
@@ -448,89 +477,91 @@ button:disabled {
 .severity-block.is-unclassified .severity-head { background: var(--warn-bg); color: var(--warn); }
 .severity-note {
   margin: 0;
-  padding: 10px 14px;
+  padding: 7px 12px;
   border-top: 1px solid var(--border);
   color: var(--muted);
-  font-size: 0.95rem;
+  font-size: 0.84rem;
 }
 
 .history-head {
-  margin: 22px 0 4px;
-  font-size: 1.15rem;
+  margin: 16px 0 4px;
+  font-size: 1rem;
 }
 
 .defect-row {
   display: grid;
-  grid-template-columns: minmax(160px, 1.2fr) 300px minmax(180px, 1fr);
-  gap: 12px;
+  grid-template-columns: minmax(150px, 1.2fr) 270px minmax(160px, 1fr);
+  gap: 10px;
   align-items: center;
-  padding: 10px 14px;
+  padding: 6px 12px;
   border-top: 1px solid var(--border);
 }
 
 .defect-row.is-offender { background: rgba(239, 107, 90, 0.14); }
 .defect-name { font-weight: 700; }
 
-.remark-field { margin: 16px 0 8px; }
+.remark-field { margin: 12px 0 6px; }
 .req-flag { color: var(--bad); font-weight: 700; }
 
 .form-error {
   background: var(--bad-bg);
   color: #ffd0c8;
-  padding: 10px 12px;
-  border-radius: 10px;
+  padding: 8px 11px;
+  border-radius: 8px;
+  font-size: 0.9rem;
 }
 
 .form-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   justify-content: flex-end;
-  margin-top: 16px;
+  margin-top: 12px;
 }
 
 .result-card {
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 22px 18px;
+  border-radius: 13px;
+  padding: 16px 14px;
   text-align: center;
 }
 
 .result-status {
-  font-size: clamp(2rem, 4vw + 1rem, 3rem);
+  font-size: clamp(1.8rem, 3vw + 1rem, 2.6rem);
   font-weight: 800;
-  margin: 8px 0;
+  margin: 6px 0;
 }
 
 .result-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  margin-top: 16px;
+  gap: 8px;
+  margin-top: 12px;
   text-align: left;
 }
 
 .compare {
   background: #0f131c;
-  border-radius: 12px;
-  padding: 12px;
+  border-radius: 10px;
+  padding: 9px 10px;
 }
 
-.compare .label { color: var(--muted); font-size: 0.8rem; }
-.compare .nums { font-size: 1.5rem; font-weight: 800; margin-top: 4px; }
+.compare .label { color: var(--muted); font-size: 0.74rem; }
+.compare .nums { font-size: 1.45rem; font-weight: 800; margin-top: 2px; }
 .compare.is-fail { outline: 1px solid var(--bad); }
 
 .next-steps {
   text-align: left;
-  margin-top: 16px;
+  margin-top: 12px;
   background: var(--info-bg);
-  border-radius: 12px;
-  padding: 12px 14px;
+  border-radius: 10px;
+  padding: 9px 11px;
+  font-size: 0.88rem;
 }
 
-.history-block { margin-top: 16px; }
-.history-block h3 { margin: 0 0 8px; }
+.history-block { margin-top: 12px; }
+.history-block h3 { margin: 0 0 6px; }
 
 @media (max-width: 900px) {
   .charts-grid { grid-template-columns: 1fr; }
