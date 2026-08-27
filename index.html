@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>FG Transaction QC</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect fill='%23d4a017' width='32' height='32' rx='6'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-size='13' fill='%231a1404' font-family='sans-serif' font-weight='700'%3EFG%3C/text%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="topbar-title">
+        <button type="button" id="btn-home" class="btn-home" aria-label="Back to awaiting list">FG</button>
+        <div>
+          <h1>FG Transaction QC</h1>
+          <p>Finished goods inspection — Carter AQL. Verdict is computed by the database.</p>
+        </div>
+      </div>
+      <div class="topbar-controls">
+        <label class="field">
+          <span>Inspector</span>
+          <select id="inspector" aria-label="Inspector"></select>
+        </label>
+        <label class="field">
+          <span>Database</span>
+          <select id="database" aria-label="Database">
+            <option value="KOL">KOL</option>
+            <option value="AHM">AHM</option>
+          </select>
+        </label>
+      </div>
+    </header>
+
+    <nav class="tabs" id="main-tabs" aria-label="Main views">
+      <button type="button" class="tab is-active" data-view="pending">Awaiting inspection</button>
+      <button type="button" class="tab" data-view="dashboard">Dashboard</button>
+    </nav>
+
+    <p id="global-status" class="global-status" role="status" hidden></p>
+
+    <!-- Pending queue -->
+    <section id="view-pending" class="view" data-view="pending">
+      <div class="toolbar">
+        <label class="field grow">
+          <span>Search GPN, job, name or client</span>
+          <input id="pending-search" type="search" placeholder="Type to filter…" autocomplete="off" />
+        </label>
+        <label class="field">
+          <span>Production unit</span>
+          <select id="pending-unit">
+            <option value="">All units</option>
+          </select>
+        </label>
+        <button type="button" id="btn-pending-refresh" class="btn-primary">Refresh list</button>
+      </div>
+      <p id="pending-meta" class="meta-line"></p>
+      <div class="table-wrap">
+        <table class="data-table" id="pending-table">
+          <thead>
+            <tr>
+              <th>GPN No</th>
+              <th>GPN Date</th>
+              <th>Waiting</th>
+              <th>Job No</th>
+              <th>Job Name</th>
+              <th>Client</th>
+              <th>Category</th>
+              <th class="num">Lot size<br /><span class="th-hint">inner cartons</span></th>
+              <th class="num">Required sample</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="pending-body">
+            <tr><td colspan="11" class="empty">Loading lots awaiting inspection…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pager" id="pending-pager" hidden>
+        <button type="button" id="btn-pending-prev">Previous</button>
+        <span id="pending-page-label"></span>
+        <button type="button" id="btn-pending-next">Next</button>
+      </div>
+    </section>
+
+    <!-- Dashboard -->
+    <section id="view-dashboard" class="view" data-view="dashboard" hidden>
+      <div class="toolbar">
+        <label class="field">
+          <span>From</span>
+          <input id="dash-from" type="date" />
+        </label>
+        <label class="field">
+          <span>To</span>
+          <input id="dash-to" type="date" />
+        </label>
+        <label class="field">
+          <span>Production unit</span>
+          <select id="dash-unit">
+            <option value="">All units</option>
+          </select>
+        </label>
+        <label class="field grow">
+          <span>Job / FGQC / GPN search</span>
+          <input id="dash-job" type="search" placeholder="Job number…" autocomplete="off" />
+        </label>
+        <button type="button" id="btn-dash-load" class="btn-primary">Load dashboard</button>
+      </div>
+      <p class="meta-line">Latest verdict per lot. Reworked lots show only their current status. Percentages always show the lot count behind them.</p>
+      <div id="dash-kpis" class="kpi-grid"></div>
+      <div class="charts-grid">
+        <article class="panel chart-panel chart-panel-wide">
+          <h2>Top defect characteristics</h2>
+          <p class="panel-sub">Inner cartons found, latest submission per lot, split by class.</p>
+          <div id="chart-defects" class="chart-body"></div>
+        </article>
+        <article class="panel chart-panel">
+          <h2>Acceptance rate over time</h2>
+          <div id="chart-trend" class="chart-body"></div>
+        </article>
+        <article class="panel chart-panel">
+          <h2>Rejections by class</h2>
+          <p class="panel-sub">A lot can fail more than one class.</p>
+          <div id="chart-class" class="chart-body"></div>
+        </article>
+        <article class="panel chart-panel">
+          <h2>Rejections by production unit</h2>
+          <div id="chart-unit" class="chart-body"></div>
+        </article>
+      </div>
+      <article class="panel">
+        <h2 id="dash-table-title">Inspections</h2>
+        <div class="table-wrap">
+          <table class="data-table" id="dash-table">
+            <thead>
+              <tr>
+                <th>FGQC No</th>
+                <th>Date</th>
+                <th>Inspector</th>
+                <th>Job No</th>
+                <th>GPN No</th>
+                <th class="num">Lot size</th>
+                <th class="num">Sample</th>
+                <th>Critical</th>
+                <th>Major</th>
+                <th>Minor</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="dash-body">
+              <tr><td colspan="11" class="empty">Load the dashboard to see inspections.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pager" id="dash-pager" hidden>
+          <button type="button" id="btn-dash-prev">Previous</button>
+          <span id="dash-page-label"></span>
+          <button type="button" id="btn-dash-next">Next</button>
+        </div>
+      </article>
+    </section>
+
+    <!-- QC form -->
+    <section id="view-form" class="view" data-view="form" hidden>
+      <div id="form-reject-banner" class="banner banner-reject" hidden></div>
+      <div id="form-plan-banner" class="banner banner-warn" hidden></div>
+      <div id="form-prev-banner" class="banner banner-info" hidden></div>
+
+      <div class="plan-band" id="plan-band">
+        <p class="plan-line" id="plan-lot-line">Loading sampling plan…</p>
+        <p class="plan-accept" id="plan-accept-line"></p>
+        <p class="plan-unit-note">Every number on this band is <strong>inner cartons</strong>, not pieces.</p>
+      </div>
+
+      <div class="form-header" id="form-header"></div>
+
+      <div class="sample-row">
+        <label class="field sample-field">
+          <span>Cartons inspected (inner cartons)</span>
+          <div class="stepper">
+            <button type="button" class="stepper-btn" data-step="-1" data-target="sample-size" aria-label="Decrease cartons inspected">−</button>
+            <input id="sample-size" type="number" inputmode="numeric" min="1" step="1" />
+            <button type="button" class="stepper-btn" data-step="1" data-target="sample-size" aria-label="Increase cartons inspected">+</button>
+          </div>
+        </label>
+        <p class="sample-hint">This is the one number besides defect counts that the verdict depends on. Default is the plan’s required sample.</p>
+      </div>
+
+      <div id="form-sections" class="form-sections"></div>
+
+      <label class="field remark-field">
+        <span>Inspection remark <span id="remark-required" class="req-flag" hidden>(required — a class is over its accept number)</span></span>
+        <textarea id="form-remark" rows="3" placeholder="Optional unless a class is over limit."></textarea>
+      </label>
+
+      <p id="form-error" class="form-error" hidden></p>
+
+      <div class="form-actions">
+        <button type="button" id="btn-form-back" class="btn-secondary">Back to list</button>
+        <button type="button" id="btn-submit" class="btn-primary btn-submit">Submit inspection</button>
+      </div>
+    </section>
+
+    <!-- Confirmation -->
+    <section id="view-result" class="view" data-view="result" hidden>
+      <article class="result-card" id="result-card"></article>
+      <div class="form-actions">
+        <button type="button" id="btn-result-list" class="btn-primary">Back to awaiting inspection</button>
+        <button type="button" id="btn-result-detail" class="btn-secondary">Open this inspection</button>
+      </div>
+    </section>
+
+    <!-- Read-only detail -->
+    <section id="view-detail" class="view" data-view="detail" hidden>
+      <article class="panel" id="detail-card">
+        <p class="empty">Loading inspection…</p>
+      </article>
+      <div class="form-actions">
+        <button type="button" id="btn-detail-back" class="btn-secondary">Back</button>
+      </div>
+    </section>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
