@@ -436,6 +436,29 @@ button:disabled {
 .severity-head.is-limit { background: var(--warn-bg); color: var(--warn); }
 .severity-head.is-over { background: var(--bad-bg); color: var(--bad); }
 
+/*
+ * Characteristics the parameter master gives no severity. Dashed edge so the
+ * block reads as "not part of the count" at a glance, and never as a fourth
+ * AQL class.
+ */
+.severity-block.is-unclassified {
+  border-style: dashed;
+  border-color: var(--warn);
+}
+.severity-block.is-unclassified .severity-head { background: var(--warn-bg); color: var(--warn); }
+.severity-note {
+  margin: 0;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.history-head {
+  margin: 22px 0 4px;
+  font-size: 1.15rem;
+}
+
 .defect-row {
   display: grid;
   grid-template-columns: minmax(160px, 1.2fr) 300px minmax(180px, 1fr);
