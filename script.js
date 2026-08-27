@@ -7,6 +7,14 @@
   const PAGE_SIZE = Number(cfg.pageSize || 25);
   const SHIFT_HOURS = Number(cfg.shiftHours || 8);
   const SEVERITY_ORDER = ['Critical', 'Major', 'Minor'];
+  /*
+   * A characteristic whose severity the master does not resolve. Spec section 5
+   * question 1 is still open, so the form shows these in their own block and
+   * refuses to count them rather than filing them under Minor — a Critical
+   * defect counted as Minor turns a lot that must be rejected on one defect
+   * into a lot that accepts up to the Minor accept number.
+   */
+  const UNCLASSIFIED = 'Unclassified';
   const INSPECTOR_KEY = 'fgqc-inspector';
   const DB_KEY = 'fgqc-database';
   const DRAFT_PREFIX = 'fgqc-draft-';
@@ -46,6 +54,7 @@
     chartUnit: document.getElementById('chart-unit'),
     formRejectBanner: document.getElementById('form-reject-banner'),
     formPlanBanner: document.getElementById('form-plan-banner'),
+    formSeverityBanner: document.getElementById('form-severity-banner'),
     formPrevBanner: document.getElementById('form-prev-banner'),
     planLotLine: document.getElementById('plan-lot-line'),
     planAcceptLine: document.getElementById('plan-accept-line'),
@@ -290,39 +299,58 @@
     const s = String(value || '').trim().toLowerCase();
     if (s.startsWith('crit')) return 'Critical';
     if (s.startsWith('maj')) return 'Major';
-    return 'Minor';
+    if (s.startsWith('min')) return 'Minor';
+    return UNCLASSIFIED;
   }
 
   function itemKey(item) {
     return String(item.fgqcParameterSettingID || item.characterstics);
   }
 
+  function emptyCount() {
+    return { critical: 0, major: 0, minor: 0, unclassified: 0, remark: '' };
+  }
+
   function countFor(item) {
     const key = itemKey(item);
-    const row = state.counts[key] || { critical: 0, major: 0, minor: 0, remark: '' };
+    const row = state.counts[key] || emptyCount();
     const sev = normalizeSeverity(item.severity);
     if (sev === 'Critical') return Number(row.critical) || 0;
     if (sev === 'Major') return Number(row.major) || 0;
-    return Number(row.minor) || 0;
+    if (sev === 'Minor') return Number(row.minor) || 0;
+    return Number(row.unclassified) || 0;
   }
 
   function setCount(item, value, remark) {
     const key = itemKey(item);
     const sev = normalizeSeverity(item.severity);
     const n = Math.max(0, Math.trunc(Number(value) || 0));
-    const prev = state.counts[key] || { critical: 0, major: 0, minor: 0, remark: '' };
+    const prev = state.counts[key] || emptyCount();
     state.counts[key] = {
       critical: sev === 'Critical' ? n : 0,
       major: sev === 'Major' ? n : 0,
       minor: sev === 'Minor' ? n : 0,
+      // Never lands in a class column, so it can never move a verdict.
+      unclassified: sev === UNCLASSIFIED ? n : 0,
       remark: remark == null ? prev.remark : String(remark)
     };
+  }
+
+  function unclassifiedItems() {
+    return (state.template?.items || []).filter(
+      (item) => normalizeSeverity(item.severity) === UNCLASSIFIED
+    );
+  }
+
+  function unclassifiedTotal() {
+    return unclassifiedItems().reduce((sum, item) => sum + countFor(item), 0);
   }
 
   function classTotals() {
     const totals = { Critical: 0, Major: 0, Minor: 0 };
     (state.template?.items || []).forEach((item) => {
       const sev = normalizeSeverity(item.severity);
+      if (sev === UNCLASSIFIED) return;
       totals[sev] += countFor(item);
     });
     return totals;
@@ -371,6 +399,16 @@
     els.formPlanBanner.textContent = noPlan
       ? 'No sampling plan covers this lot size. You can still fill the sheet — it will be saved as Pending review.'
       : '';
+
+    const unresolved = unclassifiedItems().length;
+    els.formSeverityBanner.hidden = unresolved === 0;
+    els.formSeverityBanner.textContent = unresolved === 0
+      ? ''
+      : unresolved + ' characteristic' + (unresolved === 1 ? '' : 's')
+        + ' on this sheet have no severity on the master, so there is no way to tell'
+        + ' which AQL class they belong to. They are listed at the bottom and are not'
+        + ' counted. Leave them at zero to submit, and ask the QC in-charge to set'
+        + ' their severity.';
   }
 
   function renderFormHeader() {
@@ -400,10 +438,53 @@
     }
   }
 
+  function groupItems() {
+    const grouped = { Critical: [], Major: [], Minor: [], [UNCLASSIFIED]: [] };
+    (state.template?.items || []).forEach((item) => {
+      grouped[normalizeSeverity(item.severity)].push(item);
+    });
+    return grouped;
+  }
+
+  function renderDefectRow(item, offender) {
+    const key = itemKey(item);
+    const n = countFor(item);
+    const isOff = offender && itemKey(offender) === key && n > 0;
+    const remark = (state.counts[key] && state.counts[key].remark) || '';
+    return (
+      '<div class="defect-row' + (isOff ? ' is-offender' : '') + '" data-key="' + escapeHtml(key) + '">'
+      + '<div class="defect-name">' + escapeHtml(item.characterstics || 'Characteristic') + '</div>'
+      + '<div class="stepper">'
+      + '<button type="button" class="stepper-btn" data-item-step="-1" data-key="' + escapeHtml(key) + '" aria-label="Decrease">−</button>'
+      + '<input class="count-input" type="number" inputmode="numeric" min="0" step="1" data-key="' + escapeHtml(key) + '" value="' + n + '" />'
+      + '<button type="button" class="stepper-btn" data-item-step="1" data-key="' + escapeHtml(key) + '" aria-label="Increase">+</button>'
+      + '</div>'
+      + '<input class="line-remark" type="text" data-key="' + escapeHtml(key) + '" placeholder="Line remark (optional)" value="' + escapeHtml(remark) + '" />'
+      + '</div>'
+    );
+  }
+
+  function renderUnclassifiedBlock(rows) {
+    if (!rows.length) return '';
+    const total = unclassifiedTotal();
+    return (
+      '<article class="severity-block is-unclassified" data-severity="' + UNCLASSIFIED + '">'
+      + '<header class="severity-head ' + (total > 0 ? 'is-over' : '') + '">'
+      + '<span>Not classified</span>'
+      + '<span>' + escapeHtml(total > 0
+        ? fmtInt(total) + ' entered — cannot be submitted'
+        : 'no severity on the master') + '</span>'
+      + '</header>'
+      + '<p class="severity-note">These characteristics have no Critical / Major / Minor'
+      + ' setting on the parameter master, so counting them would put the defect in'
+      + ' the wrong AQL class. They are not counted towards any accept number.</p>'
+      + rows.map((item) => renderDefectRow(item, null)).join('')
+      + '</article>'
+    );
+  }
+
   function renderSections() {
-    const items = state.template?.items || [];
-    const grouped = { Critical: [], Major: [], Minor: [] };
-    items.forEach((item) => grouped[normalizeSeverity(item.severity)].push(item));
+    const grouped = groupItems();
     const flags = liveFlags();
 
     els.formSections.innerHTML = SEVERITY_ORDER.map((sev) => {
@@ -421,34 +502,16 @@
       return (
         '<article class="severity-block" data-severity="' + sev + '">'
         + '<header class="severity-head ' + headClass + '"><span>' + sev + '</span><span>' + escapeHtml(headExtra) + '</span></header>'
-        + rows.map((item) => {
-          const key = itemKey(item);
-          const n = countFor(item);
-          const isOff = offender && itemKey(offender) === key && n > 0;
-          const remark = (state.counts[key] && state.counts[key].remark) || '';
-          return (
-            '<div class="defect-row' + (isOff ? ' is-offender' : '') + '" data-key="' + escapeHtml(key) + '">'
-            + '<div class="defect-name">' + escapeHtml(item.characterstics || 'Characteristic') + '</div>'
-            + '<div class="stepper">'
-            + '<button type="button" class="stepper-btn" data-item-step="-1" data-key="' + escapeHtml(key) + '" aria-label="Decrease">−</button>'
-            + '<input class="count-input" type="number" inputmode="numeric" min="0" step="1" data-key="' + escapeHtml(key) + '" value="' + n + '" />'
-            + '<button type="button" class="stepper-btn" data-item-step="1" data-key="' + escapeHtml(key) + '" aria-label="Increase">+</button>'
-            + '</div>'
-            + '<input class="line-remark" type="text" data-key="' + escapeHtml(key) + '" placeholder="Line remark (optional)" value="' + escapeHtml(remark) + '" />'
-            + '</div>'
-          );
-        }).join('')
+        + rows.map((item) => renderDefectRow(item, offender)).join('')
         + '</article>'
       );
-    }).join('');
+    }).join('') + renderUnclassifiedBlock(grouped[UNCLASSIFIED]);
 
     updateLiveFlags();
   }
 
   function updateLiveFlags() {
-    const items = state.template?.items || [];
-    const grouped = { Critical: [], Major: [], Minor: [] };
-    items.forEach((item) => grouped[normalizeSeverity(item.severity)].push(item));
+    const grouped = groupItems();
     const flags = liveFlags();
 
     SEVERITY_ORDER.forEach((sev) => {
@@ -480,6 +543,29 @@
         rowEl.classList.toggle('is-offender', !!(offender && itemKey(offender) === key && n > 0));
       });
     });
+
+    const unclassifiedBlock = els.formSections.querySelector('[data-severity="' + UNCLASSIFIED + '"]');
+    if (unclassifiedBlock) {
+      const total = unclassifiedTotal();
+      const head = unclassifiedBlock.querySelector('.severity-head');
+      if (head) {
+        head.classList.toggle('is-over', total > 0);
+        const label = head.querySelector('span:last-child');
+        if (label) {
+          label.textContent = total > 0
+            ? fmtInt(total) + ' entered — cannot be submitted'
+            : 'no severity on the master';
+        }
+      }
+      unclassifiedBlock.querySelectorAll('.defect-row').forEach((rowEl) => {
+        const item = findItem(rowEl.getAttribute('data-key'));
+        const n = item ? countFor(item) : 0;
+        const input = rowEl.querySelector('.count-input');
+        if (input && document.activeElement !== input && String(input.value) !== String(n)) {
+          input.value = String(n);
+        }
+      });
+    }
 
     const over = SEVERITY_ORDER.filter((sev) => flags[sev].state === 'over');
     const anyOver = over.length > 0;
@@ -521,6 +607,13 @@
     }
     if (total > sample) {
       return 'Total defects (' + fmtInt(total) + ') exceed the sample size (' + fmtInt(sample) + '). Check the counts.';
+    }
+    const stranded = unclassifiedTotal();
+    if (stranded > 0) {
+      return 'Not classified (' + fmtInt(stranded) + ' entered). These characteristics have no'
+        + ' severity on the master, so the counts cannot be placed in an AQL class and the'
+        + ' verdict would be wrong. Set them back to zero and ask the QC in-charge to fix'
+        + ' the parameter master.';
     }
     const flags = liveFlags();
     const over = SEVERITY_ORDER.some((sev) => flags[sev].state === 'over');
@@ -662,6 +755,12 @@
     els.formSections.innerHTML = '<p class="empty">Loading inspection sheet…</p>';
     els.planLotLine.textContent = 'Loading sampling plan…';
     els.planAcceptLine.textContent = '';
+    // Clear the previous lot's banners — a stale "no sampling plan" or
+    // over-limit warning on a different lot is worse than none.
+    [els.formRejectBanner, els.formPlanBanner, els.formSeverityBanner].forEach((el) => {
+      el.hidden = true;
+      el.textContent = '';
+    });
     renderFormHeader();
 
     if (!lot.categoryId || lot.lotSize == null) {
@@ -676,9 +775,20 @@
         lotSize: lot.lotSize
       }));
       state.template = template;
+      /*
+       * planFound comes from the sampling plan and is never overwritten here.
+       *
+       * This used to fill in the pending row's requiredSample and flip
+       * planFound to true, which hid the "no sampling plan" banner that spec
+       * section 7.2 requires. It also left the accept numbers null, so the live
+       * limit flagging in section 7.2 silently did nothing — the inspector saw
+       * a normal form, entered counts, and got no warning at all. If the plan
+       * did not resolve, the inspector has to know.
+       */
       if (!template.planFound && Number(lot.requiredSample) > 0) {
-        template.sampleSize = Number(lot.requiredSample);
-        template.planFound = true;
+        // Still offer the queue's sample as a starting number, but keep the
+        // verdict path honest about the plan being missing.
+        template.sampleSize = template.sampleSize || Number(lot.requiredSample);
       }
       const draft = readDraft(lot);
       (template.items || []).forEach((item) => {
@@ -689,6 +799,7 @@
             critical: Number(saved.critical) || 0,
             major: Number(saved.major) || 0,
             minor: Number(saved.minor) || 0,
+            unclassified: Number(saved.unclassified) || 0,
             remark: saved.remark || ''
           };
         } else {
@@ -826,10 +937,59 @@
           + '</td><td class="num">' + fmtInt(row.major) + '</td><td class="num">' + fmtInt(row.minor)
           + '</td><td>' + escapeHtml(row.remark || '') + '</td></tr>'
         )).join('') : '<tr><td colspan="5" class="empty">No detail rows.</td></tr>')
-        + '</tbody></table></div>';
+        + '</tbody></table></div>'
+        + renderSubmissionHistory(data.submissions || [], main);
     } catch (err) {
       els.detailCard.innerHTML = '<p class="empty">' + escapeHtml(err.message) + '</p>';
     }
+  }
+
+  /*
+   * Spec section 5 question 2: a rejected lot is re-inspected against the same
+   * (JobBookingID, FGTransactionID) and the main row is replaced, so the main
+   * row no longer shows that the lot ever failed. The detail history survives
+   * replacement by design, so the rework story is told from there — which is
+   * what a buyer audit needs to see, and what spots a lot that failed twice.
+   */
+  function renderSubmissionHistory(submissions, main) {
+    if (submissions.length < 2) return '';
+    const everRejected = submissions.some((sub) => sub.wouldPass === false);
+    return (
+      '<h3 class="history-head">Inspection history</h3>'
+      + '<p class="panel-sub">'
+      + escapeHtml(
+        'This lot was submitted ' + submissions.length + ' times. The verdict above was'
+        + ' computed from the latest submission alone — earlier counts are history and'
+        + ' are never carried forward.'
+        + (everRejected
+          ? ' This lot was rejected at least once before reaching its current status of '
+            + statusWord(main.qcStatus) + '.'
+          : '')
+      )
+      + '</p>'
+      + '<div class="table-wrap"><table class="data-table"><thead><tr>'
+      + '<th>#</th><th>Date</th><th>Inspector</th><th class="num">Sample</th>'
+      + '<th class="num">Critical</th><th class="num">Major</th><th class="num">Minor</th><th>Outcome</th>'
+      + '</tr></thead><tbody>'
+      + submissions.map((sub) => {
+        const outcome = sub.wouldPass == null
+          ? pill('Pending')
+          : pill(sub.wouldPass ? 'Accepted' : 'Rejected');
+        return (
+          '<tr' + (sub.wouldPass === false ? ' class="row-rework"' : '') + '>'
+          + '<td>' + fmtInt(sub.submissionNo) + (sub.submissionNo === 1 ? ' <span class="th-hint">first pass</span>' : '') + '</td>'
+          + '<td>' + escapeHtml(fmtDate(sub.createdDate)) + '</td>'
+          + '<td>' + escapeHtml(sub.inspector || '—') + '</td>'
+          + '<td class="num">' + fmtInt(sub.sampleSize) + '</td>'
+          + '<td class="num">' + fmtInt(sub.foundCritical) + '</td>'
+          + '<td class="num">' + fmtInt(sub.foundMajor) + '</td>'
+          + '<td class="num">' + fmtInt(sub.foundMinor) + '</td>'
+          + '<td>' + outcome + '</td>'
+          + '</tr>'
+        );
+      }).join('')
+      + '</tbody></table></div>'
+    );
   }
 
   function stackedBar(label, parts, total, right) {
@@ -893,6 +1053,15 @@
     const tiles = [
       { key: '', label: 'Lots inspected', value: fmtInt(k.lotsInspected), sub: 'Latest verdict per lot' },
       { key: 'Accepted', label: 'Acceptance rate', value: k.acceptanceRate == null ? '—' : fmtNum(k.acceptanceRate, 1) + '%', sub: fmtInt(k.lotsAccepted) + ' of ' + fmtInt(k.lotsInspected) + ' lots' },
+      {
+        key: '',
+        label: 'First-pass acceptance',
+        value: k.firstPassAcceptanceRate == null ? '—' : fmtNum(k.firstPassAcceptanceRate, 1) + '%',
+        // Section 7.4: this one cannot come from the main row, which holds only
+        // the latest verdict. It is computed from the earliest submission in
+        // the detail history.
+        sub: fmtInt(k.firstPassAccepted) + ' of ' + fmtInt(k.firstPassLots) + ' lots passed first time'
+      },
       { key: 'Rejected', label: 'Lots rejected', value: fmtInt(k.lotsRejected), sub: 'Current status Rejected' },
       { key: 'Pending', label: 'Pending verdicts', value: fmtInt(k.pendingVerdicts), sub: 'No sampling plan matched' },
       { key: '', label: 'Average defect %', value: k.avgDefectPercent == null ? '—' : fmtNum(k.avgDefectPercent, 2) + '%', sub: 'Weighted by sample size (' + fmtInt(k.totalSample) + ' cartons)' },
