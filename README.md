@@ -45,7 +45,7 @@ tried.
 ### Settings
 
 ```js
-window.AppConfig.fromGPNDate  // go-live cutoff, default 2026-08-01
+window.AppConfig.fromGPNDate  // go-live cutoff, default 2026-04-01
 window.AppConfig.companyId    // sampling plans are stored against CompanyID 1
 window.AppConfig.pageSize     // rows per page, default 25
 window.AppConfig.shiftHours   // a lot waiting longer than this is highlighted

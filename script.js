@@ -3,7 +3,7 @@
 
   const cfg = window.AppConfig || {};
   const API_BASE = cfg.apiBaseUrl || 'http://127.0.0.1:3001/api';
-  const FROM_GPN_DATE = cfg.fromGPNDate || '2026-08-01';
+  const FROM_GPN_DATE = cfg.fromGPNDate || '2026-04-01';
   const PAGE_SIZE = Number(cfg.pageSize || 25);
   const SHIFT_HOURS = Number(cfg.shiftHours || 8);
   const SEVERITY_ORDER = ['Critical', 'Major', 'Minor'];
