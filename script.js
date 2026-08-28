@@ -63,7 +63,6 @@
     chartDefects: document.getElementById('chart-defects'),
     chartTrend: document.getElementById('chart-trend'),
     chartClass: document.getElementById('chart-class'),
-    chartUnit: document.getElementById('chart-unit'),
     formRejectBanner: document.getElementById('form-reject-banner'),
     formPlanBanner: document.getElementById('form-plan-banner'),
     formSeverityBanner: document.getElementById('form-severity-banner'),
@@ -1331,12 +1330,6 @@
     els.chartClass.innerHTML = classRows.map(([label, n, cls]) =>
       stackedBar(label, [{ value: n, cls }], maxClass, fmtInt(n))
     ).join('');
-
-    const units = dash.rejectionsByUnit || [];
-    const maxUnit = Math.max(1, ...units.map((u) => Number(u.rejectionCount) || 0));
-    els.chartUnit.innerHTML = units.length
-      ? units.map((u) => stackedBar(u.productionUnit, [{ value: u.rejectionCount, cls: 'plain' }], maxUnit, fmtInt(u.rejectionCount))).join('')
-      : '<p class="empty">No rejections in this range.</p>';
   }
 
   function renderKpis(kpis) {
@@ -1529,17 +1522,30 @@
    * are totals. The two are labelled differently on purpose: "6 unique" and
    * "9,300" side by side must not read as the same kind of number.
    */
-  function renderDashSummary(summary) {
+  function renderDashSummary(summary, hasRows) {
     const table = document.getElementById('dash-table');
     if (!table) return;
     let foot = table.querySelector('tfoot');
-    if (!summary) {
+    if (!hasRows) {
       if (foot) foot.remove();
       return;
     }
     if (!foot) {
       foot = document.createElement('tfoot');
       table.appendChild(foot);
+    }
+    /*
+     * Rows but no figures means the API predates this row and is not sending
+     * them. Say so rather than dropping the footer: an absent row and an API
+     * that needs deploying look identical from here, and quietly adding up the
+     * rows on screen would answer the question with the wrong number.
+     */
+    if (!summary) {
+      foot.innerHTML = '<tr class="summary-row"><td colspan="11" class="summary-missing">'
+        + 'Totals unavailable — the API this page is talking to does not send them yet. '
+        + 'Deploy the matching version of /api/qc/inspections.'
+        + '</td></tr>';
+      return;
     }
     const uniq = (n) => (n == null ? '—' : fmtInt(n) + ' unique');
     const lots = Number(summary.lots) || 0;
@@ -1583,7 +1589,7 @@
       }));
       const rows = data.rows || [];
       state.dashTotal = Number(data.total) || 0;
-      renderDashSummary(rows.length ? data.summary : null);
+      renderDashSummary(data.summary, rows.length > 0);
       els.dashTableTitle.textContent = status
         ? ('Inspections — ' + statusWord(status) + ' (' + state.dashTotal + ')')
         : ('Inspections (' + state.dashTotal + ')');
@@ -1616,7 +1622,7 @@
       els.btnDashPrev.disabled = state.dashPage <= 1;
       els.btnDashNext.disabled = state.dashPage >= pages;
     } catch (err) {
-      renderDashSummary(null);
+      renderDashSummary(null, false);
       els.dashBody.innerHTML = '<tr><td colspan="11" class="empty">' + escapeHtml(err.message) + '</td></tr>';
     }
   }
