@@ -628,3 +628,35 @@ button:disabled {
 }
 
 .btn-quiet:hover { border-color: var(--accent); }
+
+/* Summary row under the inspections table — totals for the whole filtered set. */
+.summary-row th,
+.summary-row td {
+  padding: 5px 8px;
+  font-weight: 700;
+  color: var(--text);
+  background: #191e29;
+  border-top: 2px solid var(--border);
+  border-bottom: none;
+  text-align: left;
+}
+
+/*
+ * `th` in this table is a sticky column label pinned to the top. The one in the
+ * footer is neither, so it takes neither rule back.
+ */
+.summary-row th {
+  position: static;
+  font-size: 0.7rem;
+}
+
+.summary-row .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+.summary-sub {
+  display: block;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.65rem;
+  font-weight: 500;
+  color: var(--muted);
+}

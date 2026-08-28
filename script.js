@@ -1255,6 +1255,50 @@
     dashFilterTimer = window.setTimeout(loadDashTable, delay);
   }
 
+  /*
+   * Summary row under the inspections table.
+   *
+   * The figures come from the API, not from the rows on screen. The table is
+   * paged twenty-five at a time, so adding up what is visible would describe
+   * this page while sitting under a heading that counts every matching lot —
+   * two different numbers, one row apart.
+   *
+   * Inspector, job and GPN are counts of distinct values; lot size and sample
+   * are totals. The two are labelled differently on purpose: "6 unique" and
+   * "9,300" side by side must not read as the same kind of number.
+   */
+  function renderDashSummary(summary) {
+    const table = document.getElementById('dash-table');
+    if (!table) return;
+    let foot = table.querySelector('tfoot');
+    if (!summary) {
+      if (foot) foot.remove();
+      return;
+    }
+    if (!foot) {
+      foot = document.createElement('tfoot');
+      table.appendChild(foot);
+    }
+    const uniq = (n) => (n == null ? '—' : fmtInt(n) + ' unique');
+    const lots = Number(summary.lots) || 0;
+    foot.innerHTML = '<tr class="summary-row">'
+      + '<th scope="row">Totals<span class="summary-sub">'
+        + fmtInt(lots) + (lots === 1 ? ' lot' : ' lots') + '</span></th>'
+      + '<td></td>'
+      + '<td title="Distinct inspectors across every lot matching these filters">'
+        + escapeHtml(uniq(summary.inspectors)) + '</td>'
+      + '<td title="Distinct job numbers across every lot matching these filters">'
+        + escapeHtml(uniq(summary.jobs)) + '</td>'
+      + '<td title="Distinct GPN numbers across every lot matching these filters">'
+        + escapeHtml(uniq(summary.gpns)) + '</td>'
+      + '<td class="num" title="Lot size added up across every lot matching these filters">'
+        + escapeHtml(summary.totalLotSize == null ? '—' : fmtInt(summary.totalLotSize)) + '</td>'
+      + '<td class="num" title="Sample size added up across every lot matching these filters">'
+        + escapeHtml(summary.totalSampleSize == null ? '—' : fmtInt(summary.totalSampleSize)) + '</td>'
+      + '<td></td><td></td><td></td><td></td>'
+      + '</tr>';
+  }
+
   async function loadDashTable() {
     renderDashFilterRow();
     els.dashBody.innerHTML = '<tr><td colspan="11" class="empty">Loading inspections…</td></tr>';
@@ -1277,6 +1321,7 @@
       }));
       const rows = data.rows || [];
       state.dashTotal = Number(data.total) || 0;
+      renderDashSummary(rows.length ? data.summary : null);
       els.dashTableTitle.textContent = status
         ? ('Inspections — ' + statusWord(status) + ' (' + state.dashTotal + ')')
         : ('Inspections (' + state.dashTotal + ')');
@@ -1309,6 +1354,7 @@
       els.btnDashPrev.disabled = state.dashPage <= 1;
       els.btnDashNext.disabled = state.dashPage >= pages;
     } catch (err) {
+      renderDashSummary(null);
       els.dashBody.innerHTML = '<tr><td colspan="11" class="empty">' + escapeHtml(err.message) + '</td></tr>';
     }
   }
