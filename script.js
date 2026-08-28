@@ -580,7 +580,7 @@
     const t = state.template;
     if (!t) return;
     els.planLotLine.textContent =
-      'Lot ' + fmtInt(t.lotSize) + ' inner cartons  →  Required sample ' + fmtInt(t.sampleSize);
+      'Lot ' + fmtInt(t.lotSize) + '  →  Required sample ' + fmtInt(t.sampleSize);
     const a = t.referenceAQL || {};
     els.planAcceptLine.textContent =
       'Accept:  Critical ' + fmtInt(a.critical) + '  ·  Major ' + fmtInt(a.major) + '  ·  Minor ' + fmtInt(a.minor);
@@ -813,9 +813,9 @@
     }
     const sample = Math.trunc(Number(els.sampleSize.value) || 0);
     const lotSize = Number(state.template?.lotSize);
-    if (sample <= 0) return 'Cartons inspected must be greater than zero.';
+    if (sample <= 0) return 'Quantity inspected must be greater than zero.';
     if (Number.isFinite(lotSize) && sample > lotSize) {
-      return 'Cartons inspected (' + fmtInt(sample) + ') cannot exceed the lot size (' + fmtInt(lotSize) + ' inner cartons).';
+      return 'Quantity inspected (' + fmtInt(sample) + ') cannot exceed the lot size (' + fmtInt(lotSize) + ').';
     }
     const items = state.template?.items || [];
     let total = 0;
@@ -907,7 +907,7 @@
       ['Job Name', (row, d) => d.jobName],
       ['Client', (row, d) => d.client],
       ['Category', (row, d) => d.categoryName],
-      ['Lot size (inner cartons)', (row, d) => (Number.isFinite(Number(row.lotSize)) ? String(row.lotSize) : '')],
+      ['Lot size', (row, d) => (Number.isFinite(Number(row.lotSize)) ? String(row.lotSize) : '')],
       ['Required sample', (row, d) => (Number.isFinite(Number(row.requiredSample)) ? String(row.requiredSample) : '')],
       ['Status', (row, d) => d.status]
     ];
@@ -1009,7 +1009,7 @@
     const allCount = (state.pendingAllRows || []).length;
     const filteredNote = filtered.length !== allCount ? (' (filtered from ' + allCount + ')') : '';
     els.pendingMeta.textContent = filtered.length
-      ? ('Showing ' + from + '–' + to + ' of ' + filtered.length + ' lots' + filteredNote + ', ' + rangeLabel + '. Oldest GPN first. Lot size is inner cartons.')
+      ? ('Showing ' + from + '–' + to + ' of ' + filtered.length + ' lots' + filteredNote + ', ' + rangeLabel + '. Oldest GPN first.')
       : ('No lots awaiting inspection in ' + rangeLabel + '.');
     els.pendingPager.hidden = filtered.length <= PAGE_SIZE;
     els.pendingPageLabel.textContent = 'Page ' + state.pendingPage + ' of ' + pages;
@@ -1055,7 +1055,7 @@
     renderFormHeader();
 
     if (!lot.categoryId || lot.lotSize == null) {
-      showFormError('This form needs categoryId and lotSize (inner cartons) on the URL. Open it from the awaiting list.');
+      showFormError('This form needs categoryId and lotSize on the URL. Open it from the awaiting list.');
       return;
     }
 
@@ -1191,7 +1191,7 @@
     els.resultCard.innerHTML =
       '<p class="meta-line">FGQC ' + escapeHtml(result.fgqcNo || '—') + '</p>'
       + '<div class="result-status">' + pill(status) + '</div>'
-      + '<p>Lot ' + fmtInt(result.lotSize) + ' inner cartons · inspected ' + fmtInt(result.inspected)
+      + '<p>Lot ' + fmtInt(result.lotSize) + ' · inspected ' + fmtInt(result.inspected)
       + ' · required sample ' + fmtInt(result.requiredSample) + '</p>'
       + (result.defectPercent != null ? '<p>Defect % (information only): ' + fmtNum(result.defectPercent, 2) + '%</p>' : '')
       + '<div class="result-grid">'
@@ -1217,7 +1217,7 @@
         + '<div class="form-header" style="margin-top:12px">'
         + [['Job No', main.jobNo], ['Job Name', main.jobName], ['Client', main.client], ['GPN No', main.gpnNo],
           ['Inspector', main.inspector], ['Date', fmtDate(main.inspectedOn)],
-          ['Lot size (inner cartons)', fmtInt(main.lotSize)], ['Sample size', fmtInt(main.sampleSize)]]
+          ['Lot size', fmtInt(main.lotSize)], ['Sample size', fmtInt(main.sampleSize)]]
           .map(([k, v]) => '<div class="kv"><dt>' + escapeHtml(k) + '</dt><dd>' + escapeHtml(v || '—') + '</dd></div>').join('')
         + '</div>'
         + '<p class="plan-accept">Accept snapshot: Critical ' + fmtInt(aql.critical) + ' · Major ' + fmtInt(aql.major) + ' · Minor ' + fmtInt(aql.minor) + '</p>'
@@ -1349,7 +1349,7 @@
       },
       { key: 'Rejected', label: 'Lots rejected', value: fmtInt(k.lotsRejected), sub: 'Current status Rejected' },
       { key: 'Pending', label: 'Pending verdicts', value: fmtInt(k.pendingVerdicts), sub: 'No sampling plan matched' },
-      { key: '', label: 'Average defect %', value: k.avgDefectPercent == null ? '—' : fmtNum(k.avgDefectPercent, 2) + '%', sub: 'Weighted by sample size (' + fmtInt(k.totalSample) + ' cartons)' },
+      { key: '', label: 'Average defect %', value: k.avgDefectPercent == null ? '—' : fmtNum(k.avgDefectPercent, 2) + '%', sub: 'Weighted by sample size (' + fmtInt(k.totalSample) + ')' },
       { key: '__awaiting', label: 'Awaiting inspection now', value: fmtInt(k.awaitingInspection), sub: 'Queue, not a stored status' }
     ];
     els.dashKpis.innerHTML = tiles.map((t) => (

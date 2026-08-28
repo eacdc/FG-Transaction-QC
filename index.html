@@ -98,7 +98,7 @@
               <th>Job Name</th>
               <th>Client</th>
               <th>Category</th>
-              <th class="num">Lot size<br /><span class="th-hint">inner cartons</span></th>
+              <th class="num">Lot size</th>
               <th class="num">Required sample</th>
               <th>Status</th>
               <th></th>
@@ -163,7 +163,7 @@
       <div class="charts-grid">
         <article class="panel chart-panel chart-panel-wide">
           <h2>Top defect characteristics</h2>
-          <p class="panel-sub">Inner cartons found, latest submission per lot, split by class.</p>
+          <p class="panel-sub">Defects found, latest submission per lot, split by class.</p>
           <div id="chart-defects" class="chart-body"></div>
         </article>
         <article class="panel chart-panel">
@@ -218,18 +218,17 @@
       <div class="plan-band" id="plan-band">
         <p class="plan-line" id="plan-lot-line">Loading sampling plan…</p>
         <p class="plan-accept" id="plan-accept-line"></p>
-        <p class="plan-unit-note">Every number on this band is <strong>inner cartons</strong>, not pieces.</p>
       </div>
 
       <div class="form-header" id="form-header"></div>
 
       <div class="sample-row">
         <label class="field sample-field">
-          <span>Cartons inspected (inner cartons)</span>
+          <span>Quantity inspected</span>
           <div class="stepper">
-            <button type="button" class="stepper-btn" data-step="-1" data-target="sample-size" aria-label="Decrease cartons inspected">−</button>
+            <button type="button" class="stepper-btn" data-step="-1" data-target="sample-size" aria-label="Decrease quantity inspected">−</button>
             <input id="sample-size" type="number" inputmode="numeric" min="1" step="1" />
-            <button type="button" class="stepper-btn" data-step="1" data-target="sample-size" aria-label="Increase cartons inspected">+</button>
+            <button type="button" class="stepper-btn" data-step="1" data-target="sample-size" aria-label="Increase quantity inspected">+</button>
           </div>
         </label>
         <p class="sample-hint">This is the one number besides defect counts that the verdict depends on. Default is the plan’s required sample.</p>
