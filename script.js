@@ -15,30 +15,42 @@
    * into a lot that accepts up to the Minor accept number.
    */
   const UNCLASSIFIED = 'Unclassified';
-  const INSPECTOR_KEY = 'fgqc-inspector';
-  const DB_KEY = 'fgqc-database';
+  const SESSION_KEY = 'fgqc_session';
   const DRAFT_PREFIX = 'fgqc-draft-';
   const PENDING_ROW_KEY = 'fgqc-pending-row';
   const RESULT_KEY = 'fgqc-last-result';
 
   const els = {
-    inspector: document.getElementById('inspector'),
-    database: document.getElementById('database'),
+    loginSection: document.getElementById('login-section'),
+    loginForm: document.getElementById('login-form'),
+    loginUsername: document.getElementById('login-username'),
+    loginDatabase: document.getElementById('login-database'),
+    loginError: document.getElementById('login-error'),
+    btnLogin: document.getElementById('btn-login'),
+    appShell: document.getElementById('app-shell'),
+    userInfo: document.getElementById('user-info'),
+    btnLogout: document.getElementById('btn-logout'),
     globalStatus: document.getElementById('global-status'),
     mainTabs: document.getElementById('main-tabs'),
     btnHome: document.getElementById('btn-home'),
     pendingSearch: document.getElementById('pending-search'),
-    pendingUnit: document.getElementById('pending-unit'),
+    pendingRange: document.getElementById('pending-range'),
+    pendingCustomDates: document.getElementById('pending-custom-dates'),
+    pendingFrom: document.getElementById('pending-from'),
+    pendingTo: document.getElementById('pending-to'),
     pendingMeta: document.getElementById('pending-meta'),
+    pendingTable: document.getElementById('pending-table'),
     pendingBody: document.getElementById('pending-body'),
     pendingPager: document.getElementById('pending-pager'),
     pendingPageLabel: document.getElementById('pending-page-label'),
+    btnPendingExport: document.getElementById('btn-pending-export'),
     btnPendingRefresh: document.getElementById('btn-pending-refresh'),
     btnPendingPrev: document.getElementById('btn-pending-prev'),
     btnPendingNext: document.getElementById('btn-pending-next'),
+    dashRange: document.getElementById('dash-range'),
+    dashCustomDates: document.getElementById('dash-custom-dates'),
     dashFrom: document.getElementById('dash-from'),
     dashTo: document.getElementById('dash-to'),
-    dashUnit: document.getElementById('dash-unit'),
     dashJob: document.getElementById('dash-job'),
     dashKpis: document.getElementById('dash-kpis'),
     dashBody: document.getElementById('dash-body'),
@@ -78,6 +90,21 @@
     pendingPage: 1,
     pendingTotal: 0,
     pendingRows: [],
+    pendingAllRows: [],
+    pendingFrom: '',
+    pendingTo: '',
+    colFilters: {
+      gpnNo: '',
+      gpnDate: '',
+      waiting: '',
+      jobNo: '',
+      jobName: '',
+      client: '',
+      categoryName: '',
+      lotSize: '',
+      requiredSample: '',
+      status: ''
+    },
     dashPage: 1,
     dashTotal: 0,
     dashStatusFilter: '',
@@ -91,7 +118,6 @@
 
   let searchTimer = null;
   let draftTimer = null;
-  let unitsLoaded = false;
 
   function escapeHtml(value) {
     return String(value == null ? '' : value)
@@ -208,18 +234,182 @@
     return data;
   }
 
+  function todayYmd() {
+    try {
+      return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+    } catch {
+      return toDateInput(new Date());
+    }
+  }
+
+  function addDaysYmd(ymdStr, deltaDays) {
+    const parts = String(ymdStr || '').split('-').map(Number);
+    if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return ymdStr;
+    const dt = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2] + deltaDays));
+    return dt.toISOString().slice(0, 10);
+  }
+
+  function clampYmd(value, min, max) {
+    let v = value;
+    if (min && v < min) v = min;
+    if (max && v > max) v = max;
+    return v;
+  }
+
+  function rangeFromPreset(preset, customFrom, customTo) {
+    const today = todayYmd();
+    const days = Number(preset);
+    if (preset === 'custom' || !Number.isFinite(days) || days <= 0) {
+      let from = customFrom || addDaysYmd(today, -13);
+      let to = customTo || today;
+      if (from > to) {
+        const swap = from;
+        from = to;
+        to = swap;
+      }
+      from = clampYmd(from, FROM_GPN_DATE, today);
+      to = clampYmd(to, FROM_GPN_DATE, today);
+      if (from > to) from = to;
+      return { from, to };
+    }
+    return {
+      from: clampYmd(addDaysYmd(today, -(days - 1)), FROM_GPN_DATE, today),
+      to: today
+    };
+  }
+
+  function bindDateLimits() {
+    const today = todayYmd();
+    [els.pendingFrom, els.pendingTo, els.dashFrom, els.dashTo].forEach((el) => {
+      if (!el) return;
+      el.min = FROM_GPN_DATE;
+      el.max = today;
+    });
+  }
+
+  function syncCustomDates(wrap, fromEl, toEl, preset, range) {
+    const custom = preset === 'custom';
+    if (wrap) wrap.hidden = !custom;
+    if (fromEl) fromEl.value = range.from;
+    if (toEl) toEl.value = range.to;
+  }
+
+  function pendingDateRange() {
+    const preset = (els.pendingRange && els.pendingRange.value) || '14';
+    const range = rangeFromPreset(
+      preset,
+      els.pendingFrom && els.pendingFrom.value,
+      els.pendingTo && els.pendingTo.value
+    );
+    syncCustomDates(els.pendingCustomDates, els.pendingFrom, els.pendingTo, preset, range);
+    state.pendingFrom = range.from;
+    state.pendingTo = range.to;
+    return range;
+  }
+
+  function dashDateRange() {
+    const preset = (els.dashRange && els.dashRange.value) || '14';
+    const range = rangeFromPreset(
+      preset,
+      els.dashFrom && els.dashFrom.value,
+      els.dashTo && els.dashTo.value
+    );
+    syncCustomDates(els.dashCustomDates, els.dashFrom, els.dashTo, preset, range);
+    return range;
+  }
+
+  function getSession() {
+    try {
+      const s = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
+      if (s && s.userId && s.userName && s.database) return s;
+    } catch {
+      /* ignore */
+    }
+    return null;
+  }
+
+  function setSession(session) {
+    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  }
+
+  function clearSession() {
+    localStorage.removeItem(SESSION_KEY);
+  }
+
+  function showLoggedOut() {
+    els.loginSection.hidden = false;
+    els.appShell.hidden = true;
+    els.loginError.hidden = true;
+    els.loginError.textContent = '';
+    if (els.loginDatabase && els.loginDatabase.value) {
+      loadLoginUsers();
+    } else if (els.loginUsername) {
+      els.loginUsername.innerHTML = '<option value="">Select database first</option>';
+      els.loginUsername.disabled = true;
+    }
+    if (els.loginDatabase) els.loginDatabase.focus();
+  }
+
+  function showLoggedIn() {
+    const s = getSession();
+    if (!s) {
+      showLoggedOut();
+      return false;
+    }
+    els.loginSection.hidden = true;
+    els.appShell.hidden = false;
+    els.userInfo.textContent = s.userName + ' (' + s.database + ')';
+    return true;
+  }
+
   function db() {
-    return els.database.value || cfg.defaultDatabase || 'KOL';
+    const s = getSession();
+    return (s && s.database) || cfg.defaultDatabase || 'KOL';
   }
 
   function inspectorId() {
-    const n = Number(els.inspector.value);
+    const s = getSession();
+    const n = Number(s && s.userId);
     return Number.isFinite(n) && n > 0 ? n : null;
   }
 
   function inspectorName() {
-    const opt = els.inspector.selectedOptions[0];
-    return opt ? opt.textContent : '';
+    const s = getSession();
+    return (s && s.userName) || '';
+  }
+
+  async function loadLoginUsers() {
+    const database = String(els.loginDatabase && els.loginDatabase.value || '').trim();
+    const saved = String(els.loginUsername && els.loginUsername.value || '');
+    els.loginUsername.innerHTML = '<option value="">Select username</option>';
+    if (!database) {
+      els.loginUsername.innerHTML = '<option value="">Select database first</option>';
+      els.loginUsername.disabled = true;
+      return;
+    }
+    els.loginUsername.disabled = true;
+    try {
+      const data = await api('/qc/inspectors?' + qs({ database }));
+      const rows = data.rows || [];
+      rows.forEach((row) => {
+        const opt = document.createElement('option');
+        opt.value = row.userName;
+        opt.textContent = row.userName;
+        if (row.userName === saved) opt.selected = true;
+        els.loginUsername.appendChild(opt);
+      });
+      els.loginUsername.disabled = false;
+      els.loginError.hidden = true;
+      els.loginError.textContent = '';
+      if (!rows.length) {
+        els.loginError.textContent = 'No users found in ' + database;
+        els.loginError.hidden = false;
+      }
+    } catch (err) {
+      els.loginUsername.disabled = true;
+      els.loginError.textContent = err.message || 'Could not load usernames.';
+      els.loginError.hidden = false;
+    }
   }
 
   function companyId() {
@@ -424,7 +614,7 @@
       ['Client', lot.client],
       ['GPN Date', fmtDate(lot.gpnDate)],
       ['Shift', lot.shift || '—'],
-      ['Inspector', inspectorName() || 'Select inspector']
+      ['Inspector', inspectorName() || '—']
     ];
     els.formHeader.innerHTML = cells.map(([k, v]) => (
       '<div class="kv"><dt>' + escapeHtml(k) + '</dt><dd>' + escapeHtml(v == null || v === '' ? '—' : v) + '</dd></div>'
@@ -649,7 +839,7 @@
     if (over && !String(els.formRemark.value || '').trim()) {
       return 'A class is over its accept number. Enter a remark before submitting.';
     }
-    if (!inspectorId()) return 'Select the inspector before submitting.';
+    if (!inspectorId()) return 'Sign in before submitting.';
     return null;
   }
 
@@ -658,55 +848,120 @@
     els.formError.textContent = message || '';
   }
 
-  async function loadInspectors() {
-    const saved = localStorage.getItem(INSPECTOR_KEY) || '';
-    els.inspector.innerHTML = '<option value="">Select inspector…</option>';
-    try {
-      const data = await api('/qc/inspectors?' + qs(commonParams()));
-      (data.rows || []).forEach((row) => {
-        const opt = document.createElement('option');
-        opt.value = String(row.userId);
-        opt.textContent = row.userName;
-        if (String(row.userId) === saved) opt.selected = true;
-        els.inspector.appendChild(opt);
-      });
-    } catch (err) {
-      showStatus(err.message, true);
-    }
+  function containsFilter(hay, needle) {
+    if (!needle) return true;
+    return String(hay == null ? '' : hay).toLowerCase().includes(String(needle).trim().toLowerCase());
   }
 
-  async function loadUnits() {
-    if (unitsLoaded) return;
-    try {
-      const data = await api('/qc/units?' + qs(commonParams()));
-      const opts = (data.rows || []).map((row) => (
-        '<option value="' + escapeHtml(row.productionUnitId) + '">' + escapeHtml(row.productionUnitName) + '</option>'
-      )).join('');
-      els.pendingUnit.insertAdjacentHTML('beforeend', opts);
-      els.dashUnit.insertAdjacentHTML('beforeend', opts);
-      unitsLoaded = true;
-    } catch {
-      unitsLoaded = true;
+  function pendingDisplayValues(row) {
+    const wait = waitingLabel(row.gpnDate);
+    const reason = row.pendingReason || 'Not started';
+    return {
+      gpnNo: row.gpnNo || '',
+      gpnDate: fmtDate(row.gpnDate),
+      waiting: wait.text,
+      jobNo: row.jobNo || '',
+      jobName: row.jobName || '',
+      client: row.client || '',
+      categoryName: row.categoryName || '',
+      lotSize: fmtInt(row.lotSize),
+      requiredSample: fmtInt(row.requiredSample),
+      status: statusWord(reason),
+      waitOverShift: wait.overShift,
+      reason: reason,
+      reinspect: Number(row.submissionCount) > 0
+    };
+  }
+
+  function filteredPendingRows() {
+    const q = String(els.pendingSearch && els.pendingSearch.value || '').trim().toLowerCase();
+    const filters = state.colFilters;
+    return (state.pendingAllRows || []).filter((row) => {
+      const d = pendingDisplayValues(row);
+      if (q) {
+        const blob = [d.gpnNo, d.jobNo, d.jobName, d.client].join(' ').toLowerCase();
+        if (!blob.includes(q)) return false;
+      }
+      return Object.keys(filters).every((key) => containsFilter(d[key], filters[key]));
+    });
+  }
+
+  function escapeCsvCell(value) {
+    if (value == null) return '';
+    const s = String(value);
+    if (/[",\r\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+    return s;
+  }
+
+  function exportPendingExcel() {
+    const rows = filteredPendingRows();
+    if (!rows.length) {
+      showStatus('No lots to export for the current filters.', true);
+      return;
     }
+    const columns = [
+      ['GPN No', (row, d) => d.gpnNo],
+      ['GPN Date', (row, d) => d.gpnDate],
+      ['Waiting', (row, d) => d.waiting],
+      ['Job No', (row, d) => d.jobNo],
+      ['Job Name', (row, d) => d.jobName],
+      ['Client', (row, d) => d.client],
+      ['Category', (row, d) => d.categoryName],
+      ['Lot size (inner cartons)', (row, d) => (Number.isFinite(Number(row.lotSize)) ? String(row.lotSize) : '')],
+      ['Required sample', (row, d) => (Number.isFinite(Number(row.requiredSample)) ? String(row.requiredSample) : '')],
+      ['Status', (row, d) => d.status]
+    ];
+    const header = columns.map((c) => escapeCsvCell(c[0])).join(',');
+    const body = rows.map((row) => {
+      const d = pendingDisplayValues(row);
+      return columns.map((c) => escapeCsvCell(c[1](row, d))).join(',');
+    });
+    const csv = [header].concat(body).join('\r\n');
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'fg-qc-pending-' + todayYmd() + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  async function fetchAllPending(range) {
+    const all = [];
+    let page = 1;
+    const fetchSize = 200;
+    let total = Infinity;
+    while (all.length < total) {
+      const data = await api('/qc/pending?' + qs({
+        ...commonParams(),
+        fromGPNDate: range.from,
+        toGPNDate: range.to,
+        page,
+        pageSize: fetchSize
+      }));
+      const rows = data.rows || [];
+      const reported = Number(data.total);
+      total = Number.isFinite(reported) && reported >= 0 ? reported : all.length + rows.length;
+      all.push(...rows);
+      if (!rows.length || rows.length < fetchSize) break;
+      page += 1;
+      if (page > 100) break;
+    }
+    return all;
   }
 
   async function loadPending() {
     showStatus('Loading lots awaiting inspection…');
     els.pendingBody.innerHTML = '<tr><td colspan="11" class="empty">Loading lots awaiting inspection…</td></tr>';
+    const range = pendingDateRange();
     try {
-      const data = await api('/qc/pending?' + qs({
-        ...commonParams(),
-        search: els.pendingSearch.value.trim(),
-        fromGPNDate: FROM_GPN_DATE,
-        page: state.pendingPage,
-        pageSize: PAGE_SIZE,
-        unitId: els.pendingUnit.value
-      }));
-      state.pendingRows = data.rows || [];
-      state.pendingTotal = Number(data.total) || 0;
+      state.pendingAllRows = await fetchAllPending(range);
       renderPending();
       showStatus('');
     } catch (err) {
+      state.pendingAllRows = [];
       els.pendingBody.innerHTML = '<tr><td colspan="11" class="empty">' + escapeHtml(err.message) + '</td></tr>';
       els.pendingMeta.textContent = '';
       els.pendingPager.hidden = true;
@@ -715,41 +970,48 @@
   }
 
   function renderPending() {
-    const rows = state.pendingRows;
+    const filtered = filteredPendingRows();
+    const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+    if (state.pendingPage > pages) state.pendingPage = pages;
+    if (state.pendingPage < 1) state.pendingPage = 1;
+    const start = (state.pendingPage - 1) * PAGE_SIZE;
+    const rows = filtered.slice(start, start + PAGE_SIZE);
+    state.pendingRows = rows;
+    state.pendingTotal = filtered.length;
     if (!rows.length) {
       els.pendingBody.innerHTML = '<tr><td colspan="11" class="empty">No lots waiting for inspection.</td></tr>';
     } else {
       els.pendingBody.innerHTML = rows.map((row, idx) => {
-        const wait = waitingLabel(row.gpnDate);
-        const reason = row.pendingReason || 'Not started';
-        const isRework = /rework|rejected/i.test(reason);
-        const reinspect = Number(row.submissionCount) > 0;
-        const btnLabel = reinspect ? 'Re-inspect' : 'Start QC';
-        const rowClass = [isRework ? 'row-rework' : '', wait.overShift ? 'row-overshift' : ''].filter(Boolean).join(' ');
+        const d = pendingDisplayValues(row);
+        const isRework = /rework|rejected/i.test(d.reason);
+        const btnLabel = d.reinspect ? 'Re-inspect' : 'Start QC';
+        const rowClass = [isRework ? 'row-rework' : '', d.waitOverShift ? 'row-overshift' : ''].filter(Boolean).join(' ');
         return (
           '<tr class="' + rowClass + '">'
-          + '<td>' + escapeHtml(row.gpnNo || '—') + '</td>'
-          + '<td>' + escapeHtml(fmtDate(row.gpnDate)) + '</td>'
-          + '<td>' + escapeHtml(wait.text) + '</td>'
-          + '<td>' + escapeHtml(row.jobNo || '—') + '</td>'
-          + '<td>' + escapeHtml(row.jobName || '—') + '</td>'
-          + '<td>' + escapeHtml(row.client || '—') + '</td>'
-          + '<td>' + escapeHtml(row.categoryName || '—') + '</td>'
-          + '<td class="num">' + escapeHtml(fmtInt(row.lotSize)) + '</td>'
-          + '<td class="num">' + escapeHtml(fmtInt(row.requiredSample)) + '</td>'
-          + '<td>' + pill(reason) + '</td>'
+          + '<td>' + escapeHtml(d.gpnNo || '—') + '</td>'
+          + '<td>' + escapeHtml(d.gpnDate) + '</td>'
+          + '<td>' + escapeHtml(d.waiting) + '</td>'
+          + '<td>' + escapeHtml(d.jobNo || '—') + '</td>'
+          + '<td>' + escapeHtml(d.jobName || '—') + '</td>'
+          + '<td>' + escapeHtml(d.client || '—') + '</td>'
+          + '<td>' + escapeHtml(d.categoryName || '—') + '</td>'
+          + '<td class="num">' + escapeHtml(d.lotSize) + '</td>'
+          + '<td class="num">' + escapeHtml(d.requiredSample) + '</td>'
+          + '<td>' + pill(d.reason) + '</td>'
           + '<td><button type="button" class="btn-primary" data-start="' + idx + '">' + escapeHtml(btnLabel) + '</button></td>'
           + '</tr>'
         );
       }).join('');
     }
-    const from = state.pendingTotal ? (state.pendingPage - 1) * PAGE_SIZE + 1 : 0;
-    const to = Math.min(state.pendingPage * PAGE_SIZE, state.pendingTotal);
-    els.pendingMeta.textContent = state.pendingTotal
-      ? ('Showing ' + from + '–' + to + ' of ' + state.pendingTotal + ' lots. Oldest GPN first. Lot size is inner cartons.')
-      : '';
-    const pages = Math.max(1, Math.ceil(state.pendingTotal / PAGE_SIZE));
-    els.pendingPager.hidden = state.pendingTotal <= PAGE_SIZE;
+    const from = filtered.length ? start + 1 : 0;
+    const to = Math.min(start + PAGE_SIZE, filtered.length);
+    const rangeLabel = fmtDate(state.pendingFrom) + ' – ' + fmtDate(state.pendingTo);
+    const allCount = (state.pendingAllRows || []).length;
+    const filteredNote = filtered.length !== allCount ? (' (filtered from ' + allCount + ')') : '';
+    els.pendingMeta.textContent = filtered.length
+      ? ('Showing ' + from + '–' + to + ' of ' + filtered.length + ' lots' + filteredNote + ', ' + rangeLabel + '. Oldest GPN first. Lot size is inner cartons.')
+      : ('No lots awaiting inspection in ' + rangeLabel + '.');
+    els.pendingPager.hidden = filtered.length <= PAGE_SIZE;
     els.pendingPageLabel.textContent = 'Page ' + state.pendingPage + ' of ' + pages;
     els.btnPendingPrev.disabled = state.pendingPage <= 1;
     els.btnPendingNext.disabled = state.pendingPage >= pages;
@@ -1107,12 +1369,12 @@
 
   async function loadDashboard() {
     showStatus('Loading dashboard…');
+    const range = dashDateRange();
     try {
       const dash = await api('/qc/dashboard?' + qs({
         ...commonParams(),
-        from: els.dashFrom.value,
-        to: els.dashTo.value,
-        unitId: els.dashUnit.value
+        from: range.from,
+        to: range.to
       }));
       renderKpis(dash.kpis);
       renderCharts(dash);
@@ -1132,11 +1394,11 @@
       return;
     }
     try {
+      const range = dashDateRange();
       const data = await api('/qc/inspections?' + qs({
         ...commonParams(),
-        from: els.dashFrom.value,
-        to: els.dashTo.value,
-        unitId: els.dashUnit.value,
+        from: range.from,
+        to: range.to,
         jobNo: els.dashJob.value.trim(),
         status,
         page: state.dashPage,
@@ -1177,6 +1439,7 @@
   }
 
   async function route() {
+    if (!showLoggedIn()) return;
     const { view, params } = parseHash();
     if (view === 'form') {
       await loadForm(params);
@@ -1193,19 +1456,13 @@
     }
     if (view === 'dashboard') {
       showView('dashboard');
-      if (!els.dashFrom.value) {
-        const to = new Date();
-        const from = new Date();
-        from.setDate(to.getDate() - 29);
-        els.dashFrom.value = toDateInput(from);
-        els.dashTo.value = toDateInput(to);
-      }
-      await loadUnits();
+      bindDateLimits();
+      dashDateRange();
       if (!state.dashLoaded) await loadDashboard();
       return;
     }
     showView('pending');
-    await loadUnits();
+    bindDateLimits();
     await loadPending();
   }
 
@@ -1234,23 +1491,44 @@
   });
   els.btnPendingPrev.addEventListener('click', () => {
     state.pendingPage = Math.max(1, state.pendingPage - 1);
-    loadPending();
+    renderPending();
   });
   els.btnPendingNext.addEventListener('click', () => {
     state.pendingPage += 1;
-    loadPending();
-  });
-  els.pendingUnit.addEventListener('change', () => {
-    state.pendingPage = 1;
-    loadPending();
+    renderPending();
   });
   els.pendingSearch.addEventListener('input', () => {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => {
       state.pendingPage = 1;
-      loadPending();
-    }, 300);
+      renderPending();
+    }, 200);
   });
+  els.pendingRange.addEventListener('change', () => {
+    state.pendingPage = 1;
+    loadPending();
+  });
+  function onPendingCustomDate() {
+    if (!els.pendingRange || els.pendingRange.value !== 'custom') return;
+    state.pendingPage = 1;
+    loadPending();
+  }
+  els.pendingFrom.addEventListener('change', onPendingCustomDate);
+  els.pendingTo.addEventListener('change', onPendingCustomDate);
+  if (els.pendingTable) {
+    els.pendingTable.addEventListener('input', (e) => {
+      const input = e.target.closest('input[data-col]');
+      if (!input) return;
+      const col = input.getAttribute('data-col');
+      if (!col || !(col in state.colFilters)) return;
+      state.colFilters[col] = input.value;
+      state.pendingPage = 1;
+      renderPending();
+    });
+  }
+  if (els.btnPendingExport) {
+    els.btnPendingExport.addEventListener('click', exportPendingExcel);
+  }
   els.pendingBody.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-start]');
     if (!btn) return;
@@ -1258,18 +1536,47 @@
     if (row) openForm(row);
   });
 
-  els.database.addEventListener('change', () => {
-    localStorage.setItem(DB_KEY, els.database.value);
-    unitsLoaded = false;
-    els.pendingUnit.innerHTML = '<option value="">All units</option>';
-    els.dashUnit.innerHTML = '<option value="">All units</option>';
-    state.dashLoaded = false;
-    loadInspectors();
-    route();
+  els.loginDatabase.addEventListener('change', () => {
+    els.loginError.hidden = true;
+    els.loginError.textContent = '';
+    loadLoginUsers();
   });
-  els.inspector.addEventListener('change', () => {
-    localStorage.setItem(INSPECTOR_KEY, els.inspector.value);
-    if (state.view === 'form') renderFormHeader();
+
+  els.loginForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const username = String(els.loginUsername.value || '').trim();
+    const database = String(els.loginDatabase.value || '').trim();
+    els.loginError.hidden = true;
+    els.loginError.textContent = '';
+    if (!username || !database) {
+      els.loginError.textContent = 'Select username and database.';
+      els.loginError.hidden = false;
+      return;
+    }
+    els.btnLogin.disabled = true;
+    try {
+      const data = await api('/qc/login?' + qs({ username, database }));
+      setSession({
+        userId: data.userId,
+        userName: data.userName || username,
+        database: data.database || database
+      });
+      state.dashLoaded = false;
+      state.pendingPage = 1;
+      await route();
+    } catch (err) {
+      els.loginError.textContent = err.message || 'Login failed.';
+      els.loginError.hidden = false;
+    } finally {
+      els.btnLogin.disabled = false;
+    }
+  });
+
+  els.btnLogout.addEventListener('click', () => {
+    clearSession();
+    state.dashLoaded = false;
+    state.pendingPage = 1;
+    showLoggedOut();
   });
 
   document.addEventListener('click', (e) => {
@@ -1316,6 +1623,19 @@
     state.dashLoaded = false;
     loadDashboard();
   });
+  els.dashRange.addEventListener('change', () => {
+    state.dashPage = 1;
+    state.dashLoaded = false;
+    loadDashboard();
+  });
+  function onDashCustomDate() {
+    if (!els.dashRange || els.dashRange.value !== 'custom') return;
+    state.dashPage = 1;
+    state.dashLoaded = false;
+    loadDashboard();
+  }
+  els.dashFrom.addEventListener('change', onDashCustomDate);
+  els.dashTo.addEventListener('change', onDashCustomDate);
   els.btnDashPrev.addEventListener('click', () => {
     state.dashPage = Math.max(1, state.dashPage - 1);
     loadDashTable();
@@ -1353,9 +1673,13 @@
   window.addEventListener('hashchange', route);
 
   (async function init() {
-    els.database.value = localStorage.getItem(DB_KEY) || cfg.defaultDatabase || 'KOL';
     try { localStorage.removeItem('fgqc-company'); } catch (e) { /* ignore */ }
-    await loadInspectors();
-    await route();
+    try { localStorage.removeItem('fgqc-inspector'); } catch (e) { /* ignore */ }
+    try { localStorage.removeItem('fgqc-database'); } catch (e) { /* ignore */ }
+    if (getSession()) {
+      await route();
+    } else {
+      showLoggedOut();
+    }
   })();
 })();

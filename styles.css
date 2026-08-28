@@ -98,7 +98,94 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  align-items: end;
+  align-items: center;
+}
+
+.custom-dates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.custom-dates[hidden] {
+  display: none !important;
+}
+
+.user-info {
+  color: var(--text);
+  font-weight: 650;
+  font-size: 0.92rem;
+}
+
+.login-wrap {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 440px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 28px 24px 24px;
+  box-shadow: var(--shadow);
+}
+
+.login-brand {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: var(--accent);
+  color: #1a1404;
+  font-weight: 800;
+  font-size: 1.05rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+
+.login-card h2 {
+  margin: 0;
+  font-size: 1.45rem;
+}
+
+.login-sub {
+  margin: 6px 0 18px;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.login-card .field {
+  margin-bottom: 12px;
+  min-width: 0;
+  width: 100%;
+}
+
+.login-card input,
+.login-card select {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.login-card .field span {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.btn-login {
+  width: 100%;
+  margin-top: 8px;
+  font-size: 1.05rem;
+}
+
+.login-card .form-error {
+  margin-top: 10px;
 }
 
 .field {
@@ -209,15 +296,36 @@ button:disabled {
   vertical-align: middle;
 }
 
+.data-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
 .data-table th {
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.03em;
   color: var(--muted);
   background: #191e29;
-  position: sticky;
-  top: 0;
-  z-index: 1;
+}
+
+.filter-row th {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+  padding: 4px 6px;
+  background: #151922;
+  vertical-align: top;
+}
+
+.filter-row input {
+  width: 100%;
+  min-width: 0;
+  min-height: 28px;
+  font-size: 0.75rem;
+  padding: 0 6px;
+  box-sizing: border-box;
 }
 
 .th-hint {
