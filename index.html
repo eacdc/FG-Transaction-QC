@@ -8,7 +8,33 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <div class="app">
+  <section id="login-section" class="login-wrap">
+    <div class="login-card">
+      <div class="login-brand">FG</div>
+      <h2>Welcome to FG Transaction QC</h2>
+      <p class="login-sub">Finished goods inspection — Carter AQL</p>
+      <form id="login-form">
+        <label class="field">
+          <span>Database</span>
+          <select id="login-database" name="database" required>
+            <option value="">Select database</option>
+            <option value="KOL">KOL</option>
+            <option value="AHM">AHM</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Username</span>
+          <select id="login-username" name="username" required disabled>
+            <option value="">Select database first</option>
+          </select>
+        </label>
+        <button type="submit" class="btn-primary btn-login" id="btn-login">Sign In</button>
+        <p id="login-error" class="form-error" hidden></p>
+      </form>
+    </div>
+  </section>
+
+  <div class="app" id="app-shell" hidden>
     <header class="topbar">
       <div class="topbar-title">
         <button type="button" id="btn-home" class="btn-home" aria-label="Back to awaiting list">FG</button>
@@ -18,17 +44,8 @@
         </div>
       </div>
       <div class="topbar-controls">
-        <label class="field">
-          <span>Inspector</span>
-          <select id="inspector" aria-label="Inspector"></select>
-        </label>
-        <label class="field">
-          <span>Database</span>
-          <select id="database" aria-label="Database">
-            <option value="KOL">KOL</option>
-            <option value="AHM">AHM</option>
-          </select>
-        </label>
+        <span id="user-info" class="user-info"></span>
+        <button type="button" id="btn-logout" class="btn-secondary">Logout</button>
       </div>
     </header>
 
@@ -47,11 +64,26 @@
           <input id="pending-search" type="search" placeholder="Type to filter…" autocomplete="off" />
         </label>
         <label class="field">
-          <span>Production unit</span>
-          <select id="pending-unit">
-            <option value="">All units</option>
+          <span>GPN date</span>
+          <select id="pending-range" aria-label="GPN date range">
+            <option value="14" selected>Last 14 days</option>
+            <option value="30">Last 30 days</option>
+            <option value="90">Last 90 days</option>
+            <option value="180">Last 180 days</option>
+            <option value="custom">Custom</option>
           </select>
         </label>
+        <div id="pending-custom-dates" class="custom-dates" hidden>
+          <label class="field">
+            <span>From</span>
+            <input id="pending-from" type="date" />
+          </label>
+          <label class="field">
+            <span>To</span>
+            <input id="pending-to" type="date" />
+          </label>
+        </div>
+        <button type="button" id="btn-pending-export" class="btn-secondary">Export to Excel</button>
         <button type="button" id="btn-pending-refresh" class="btn-primary">Refresh list</button>
       </div>
       <p id="pending-meta" class="meta-line"></p>
@@ -71,6 +103,19 @@
               <th>Status</th>
               <th></th>
             </tr>
+            <tr class="filter-row">
+              <th><input type="search" data-col="gpnNo" placeholder="Filter" aria-label="Filter GPN No" /></th>
+              <th><input type="search" data-col="gpnDate" placeholder="Filter" aria-label="Filter GPN Date" /></th>
+              <th><input type="search" data-col="waiting" placeholder="Filter" aria-label="Filter waiting" /></th>
+              <th><input type="search" data-col="jobNo" placeholder="Filter" aria-label="Filter Job No" /></th>
+              <th><input type="search" data-col="jobName" placeholder="Filter" aria-label="Filter Job Name" /></th>
+              <th><input type="search" data-col="client" placeholder="Filter" aria-label="Filter client" /></th>
+              <th><input type="search" data-col="categoryName" placeholder="Filter" aria-label="Filter category" /></th>
+              <th><input type="search" data-col="lotSize" placeholder="Filter" aria-label="Filter lot size" /></th>
+              <th><input type="search" data-col="requiredSample" placeholder="Filter" aria-label="Filter required sample" /></th>
+              <th><input type="search" data-col="status" placeholder="Filter" aria-label="Filter status" /></th>
+              <th></th>
+            </tr>
           </thead>
           <tbody id="pending-body">
             <tr><td colspan="11" class="empty">Loading lots awaiting inspection…</td></tr>
@@ -88,19 +133,25 @@
     <section id="view-dashboard" class="view" data-view="dashboard" hidden>
       <div class="toolbar">
         <label class="field">
-          <span>From</span>
-          <input id="dash-from" type="date" />
-        </label>
-        <label class="field">
-          <span>To</span>
-          <input id="dash-to" type="date" />
-        </label>
-        <label class="field">
-          <span>Production unit</span>
-          <select id="dash-unit">
-            <option value="">All units</option>
+          <span>Date range</span>
+          <select id="dash-range" aria-label="Dashboard date range">
+            <option value="14" selected>Last 14 days</option>
+            <option value="30">Last 30 days</option>
+            <option value="90">Last 90 days</option>
+            <option value="180">Last 180 days</option>
+            <option value="custom">Custom</option>
           </select>
         </label>
+        <div id="dash-custom-dates" class="custom-dates" hidden>
+          <label class="field">
+            <span>From</span>
+            <input id="dash-from" type="date" />
+          </label>
+          <label class="field">
+            <span>To</span>
+            <input id="dash-to" type="date" />
+          </label>
+        </div>
         <label class="field grow">
           <span>Job / FGQC / GPN search</span>
           <input id="dash-job" type="search" placeholder="Job number…" autocomplete="off" />
