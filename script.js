@@ -81,6 +81,7 @@
     dashPage: 1,
     dashTotal: 0,
     dashStatusFilter: '',
+    dashColFilters: {},
     dashLoaded: false,
     lot: null,
     template: null,
@@ -1124,7 +1125,138 @@
     }
   }
 
+  /*
+   * Per-column filters for the inspections table.
+   *
+   * The row is built here rather than written into index.html so the markup
+   * stays a plain table, and so this keeps working if the header is restyled.
+   *
+   * Every filter is sent to the API and applied in SQL. Filtering the rows
+   * already on screen would be a lie on a paged table: it would hide matches
+   * sitting on page two while the count in the panel heading went on quoting
+   * the unfiltered total.
+   *
+   * Date has no box of its own — the From / To fields in the toolbar are that
+   * filter, and a second pair here would be two controls for one thing.
+   */
+  const DASH_FILTERS = [
+    { key: 'fgqcNo', type: 'text', placeholder: 'FGQC no' },
+    { key: '', type: 'note', note: 'From / To above' },
+    { key: 'inspector', type: 'text', placeholder: 'Name' },
+    { key: 'jobBookingNo', type: 'text', placeholder: 'Job no' },
+    { key: 'gpnNo', type: 'text', placeholder: 'GPN no' },
+    { key: 'minLotSize', type: 'number', placeholder: '≥' },
+    { key: 'minSample', type: 'number', placeholder: '≥' },
+    { key: 'minCritical', type: 'number', placeholder: '≥' },
+    { key: 'minMajor', type: 'number', placeholder: '≥' },
+    { key: 'minMinor', type: 'number', placeholder: '≥' },
+    { key: 'status', type: 'select' }
+  ];
+
+  /* Status is also driven by the KPI tiles, so both write the same state. */
+  const DASH_STATUSES = ['Accepted', 'Rejected', 'In Progress', 'Pending'];
+
+  let dashFilterTimer = null;
+
+  function dashFilterCell(f) {
+    if (f.type === 'note') {
+      return '<td class="col-filter-note" title="The Date column is filtered by the From and To fields in the toolbar above.">'
+        + escapeHtml(f.note) + '</td>';
+    }
+    if (f.type === 'select') {
+      return '<td><select data-colfilter="status" aria-label="Filter by status">'
+        + '<option value="">All</option>'
+        + DASH_STATUSES.map((v) => (
+            '<option value="' + escapeHtml(v) + '"'
+            + (state.dashStatusFilter === v ? ' selected' : '') + '>'
+            + escapeHtml(statusWord(v)) + '</option>'
+          )).join('')
+        + '</select></td>';
+    }
+    const value = state.dashColFilters[f.key] == null ? '' : String(state.dashColFilters[f.key]);
+    return '<td' + (f.type === 'number' ? ' class="num"' : '') + '>'
+      + '<input data-colfilter="' + f.key + '"'
+      + ' type="' + (f.type === 'number' ? 'number' : 'search') + '"'
+      + (f.type === 'number' ? ' inputmode="numeric" min="0" step="1"' : '')
+      + ' value="' + escapeHtml(value) + '"'
+      + ' placeholder="' + escapeHtml(f.placeholder) + '"'
+      + ' aria-label="Filter by ' + escapeHtml(f.key) + '"'
+      + ' autocomplete="off" /></td>';
+  }
+
+  function activeDashFilterCount() {
+    let n = Object.keys(state.dashColFilters).filter((k) => state.dashColFilters[k] !== '').length;
+    if (state.dashStatusFilter && state.dashStatusFilter !== '__awaiting') n += 1;
+    return n;
+  }
+
+  function renderDashFilterRow() {
+    const head = document.querySelector('#dash-table thead');
+    if (!head) return;
+    let row = head.querySelector('.col-filter-row');
+    if (!row) {
+      row = document.createElement('tr');
+      row.className = 'col-filter-row';
+      head.appendChild(row);
+      row.addEventListener('input', onDashFilterChange);
+      row.addEventListener('change', onDashFilterChange);
+    }
+    /*
+     * Rebuilt from state, but not while someone is typing in it — replacing the
+     * innerHTML would drop focus and the caret after every keystroke.
+     */
+    if (row.contains(document.activeElement)) return;
+    row.innerHTML = DASH_FILTERS.map(dashFilterCell).join('');
+    updateDashFilterClear();
+  }
+
+  function updateDashFilterClear() {
+    const title = els.dashTableTitle;
+    if (!title || !title.parentNode) return;
+    let btn = document.getElementById('btn-dash-clear-filters');
+    if (!btn) {
+      btn = document.createElement('button');
+      btn.type = 'button';
+      btn.id = 'btn-dash-clear-filters';
+      btn.className = 'btn-quiet';
+      btn.addEventListener('click', () => {
+        state.dashColFilters = {};
+        state.dashStatusFilter = '';
+        state.dashPage = 1;
+        renderKpis(state.kpis || {});
+        renderDashFilterRow();
+        loadDashTable();
+      });
+      title.parentNode.insertBefore(btn, title.nextSibling);
+    }
+    const n = activeDashFilterCount();
+    btn.hidden = n === 0;
+    btn.textContent = 'Clear ' + n + (n === 1 ? ' filter' : ' filters');
+  }
+
+  function onDashFilterChange(e) {
+    const el = e.target.closest('[data-colfilter]');
+    if (!el) return;
+    const key = el.getAttribute('data-colfilter');
+    const value = String(el.value || '').trim();
+    if (key === 'status') {
+      state.dashStatusFilter = value;
+      renderKpis(state.kpis || {});
+    } else if (value === '') {
+      delete state.dashColFilters[key];
+    } else {
+      state.dashColFilters[key] = value;
+    }
+    state.dashPage = 1;
+    updateDashFilterClear();
+    /* Typing is debounced; picking from the select is not. */
+    window.clearTimeout(dashFilterTimer);
+    const delay = el.tagName === 'SELECT' ? 0 : 300;
+    dashFilterTimer = window.setTimeout(loadDashTable, delay);
+  }
+
   async function loadDashTable() {
+    renderDashFilterRow();
     els.dashBody.innerHTML = '<tr><td colspan="11" class="empty">Loading inspections…</td></tr>';
     const status = state.dashStatusFilter && state.dashStatusFilter !== '__awaiting' ? state.dashStatusFilter : '';
     if (state.dashStatusFilter === '__awaiting') {
@@ -1139,6 +1271,7 @@
         unitId: els.dashUnit.value,
         jobNo: els.dashJob.value.trim(),
         status,
+        ...state.dashColFilters,
         page: state.dashPage,
         pageSize: PAGE_SIZE
       }));
@@ -1148,7 +1281,11 @@
         ? ('Inspections — ' + statusWord(status) + ' (' + state.dashTotal + ')')
         : ('Inspections (' + state.dashTotal + ')');
       if (!rows.length) {
-        els.dashBody.innerHTML = '<tr><td colspan="11" class="empty">No inspections in this filter.</td></tr>';
+        els.dashBody.innerHTML = '<tr><td colspan="11" class="empty">'
+          + (activeDashFilterCount()
+              ? 'No inspections match these filters. Clearing them is the button beside the heading.'
+              : 'No inspections in this filter.')
+          + '</td></tr>';
       } else {
         els.dashBody.innerHTML = rows.map((row) => (
           '<tr data-id="' + escapeHtml(row.mainId) + '" class="dash-row" style="cursor:pointer">'

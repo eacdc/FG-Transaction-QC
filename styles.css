@@ -571,3 +571,60 @@ button:disabled {
   .result-grid { grid-template-columns: 1fr; }
   .data-table { min-width: 820px; }
 }
+
+/* ---------------------------------------------------------------------------
+   Per-column filters on the inspections table.
+
+   A second header row, so each control sits under the column it narrows. The
+   sticky rule on `th` pins the labels; this row scrolls with the body, which
+   keeps it out of the way once the inspector is reading rows rather than
+   narrowing them.
+--------------------------------------------------------------------------- */
+.col-filter-row td {
+  padding: 2px 4px;
+  background: #151a24;
+  border-bottom: 1px solid var(--border);
+}
+
+.col-filter-row input,
+.col-filter-row select {
+  width: 100%;
+  min-width: 0;
+  min-height: 22px;
+  padding: 1px 5px;
+  font-size: 0.72rem;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.col-filter-row input:focus,
+.col-filter-row select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+/* The numeric columns take a "≥ this many" threshold, so they stay narrow. */
+.col-filter-row .num input { text-align: right; }
+
+.col-filter-note {
+  font-size: 0.65rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.btn-quiet {
+  display: inline-block;
+  margin: 0 0 6px;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.btn-quiet:hover { border-color: var(--accent); }
