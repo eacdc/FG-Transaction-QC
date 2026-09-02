@@ -3,7 +3,10 @@
 
   const cfg = window.AppConfig || {};
   const API_BASE = cfg.apiBaseUrl || 'http://127.0.0.1:3001/api';
-  const FROM_GPN_DATE = cfg.fromGPNDate || '2026-04-01';
+  const FROM_GPN_DATE = cfg.fromGPNDate || '2026-09-01';
+  const EXCLUDED_PENDING_CATEGORIES = Array.isArray(cfg.excludedPendingCategories)
+    ? cfg.excludedPendingCategories
+    : ['Books', 'Leaflets', 'Tag', 'Rigid Box', 'Unprinted card'];
   const PAGE_SIZE = Number(cfg.pageSize || 25);
   const SHIFT_HOURS = Number(cfg.shiftHours || 8);
   const SEVERITY_ORDER = ['Critical', 'Major', 'Minor'];
@@ -853,6 +856,37 @@
     return String(hay == null ? '' : hay).toLowerCase().includes(String(needle).trim().toLowerCase());
   }
 
+  function normalizeCategoryName(name) {
+    return String(name || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  }
+
+  function categoryStem(name) {
+    const n = normalizeCategoryName(name);
+    if (!n) return '';
+    if (n.endsWith('ies') && n.length > 4) return n.slice(0, -3) + 'y';
+    if (n.endsWith('s') && n.length > 2 && !n.endsWith('ss')) return n.slice(0, -1);
+    return n;
+  }
+
+  function categoryExcluded(categoryName) {
+    const norm = normalizeCategoryName(categoryName);
+    if (!norm) return false;
+    const stem = categoryStem(norm);
+    for (const raw of EXCLUDED_PENDING_CATEGORIES) {
+      const base = normalizeCategoryName(raw);
+      if (!base) continue;
+      const baseStem = categoryStem(base);
+      if (norm === base || stem === baseStem) return true;
+      const prefixes = [base, baseStem];
+      for (const p of prefixes) {
+        if (!p) continue;
+        if (norm === p) return true;
+        if (norm.startsWith(p + ' ') || norm.startsWith(p + '-') || norm.startsWith(p + '|')) return true;
+      }
+    }
+    return false;
+  }
+
   function pendingDisplayValues(row) {
     const wait = waitingLabel(row.gpnDate);
     const reason = row.pendingReason || 'Not started';
@@ -957,7 +991,7 @@
     els.pendingBody.innerHTML = '<tr><td colspan="11" class="empty">Loading lots awaiting inspection…</td></tr>';
     const range = pendingDateRange();
     try {
-      state.pendingAllRows = await fetchAllPending(range);
+      state.pendingAllRows = (await fetchAllPending(range)).filter((row) => !categoryExcluded(row.categoryName));
       renderPending();
       showStatus('');
     } catch (err) {
