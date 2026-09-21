@@ -45,7 +45,8 @@ tried.
 ### Settings
 
 ```js
-window.AppConfig.fromGPNDate  // go-live cutoff, default 2026-04-01
+window.AppConfig.fromGPNDate  // go-live cutoff
+window.AppConfig.minLotQty    // GPNs smaller than this need no QC, default 50
 window.AppConfig.companyId    // sampling plans are stored against CompanyID 1
 window.AppConfig.pageSize     // rows per page, default 25
 window.AppConfig.shiftHours   // a lot waiting longer than this is highlighted
@@ -59,11 +60,20 @@ keep the two in step.
 
 ## Things worth knowing before changing this
 
-**Inner cartons, not pieces.** Lot size, sample size and every count on the
-sheet are inner cartons. A lot of 5,000 means five thousand inner cartons, not
-five thousand books. Getting this wrong pushes almost every job into the wrong
-lot band and produces the wrong sample size, which is why the plan band says so
-on screen.
+**The lot is the GPN, and lot size is what that GPN delivered.**
+`outercarton x innercarton x quantityperpack`, summed over the GPN's lines —
+the same reading of a GPN as `GPNAgg` in the API's `src/job-card-queries.js`.
+
+It is not the job quantity. `GetPendingFGQCList` reports one of those, and the
+API replaces it: matching a sampling plan against the job asks for a sample
+drawn from the whole order while the inspector is standing in front of one
+delivery. That is how a lot of 100 came to be inspected against a sample of
+315 — a sample larger than the lot it was drawn from.
+
+**A GPN under `minLotQty` pieces does not need QC.** Its row is dimmed and its
+button says so; pressing the button explains why rather than opening the form.
+The form refuses the same lot if reached by its URL, and so does the save. The
+API owns the number and sends it with the queue.
 
 **The form is built from the API response.** `GET /api/qc/template` returns the
 defect characteristics and their severity. Do not hardcode a defect name here.

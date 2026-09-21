@@ -9,6 +9,12 @@
     : ['Books', 'Leaflets', 'Tag', 'Rigid Box', 'Unprinted card'];
   const PAGE_SIZE = Number(cfg.pageSize || 25);
   const SHIFT_HOURS = Number(cfg.shiftHours || 8);
+  /*
+   * A GPN below this many pieces does not need QC. The API sends its own value
+   * with the queue and that one wins — the two deciding differently would put a
+   * button on screen that the save then refuses.
+   */
+  const MIN_LOT_QTY_FALLBACK = Number(cfg.minLotQty || 50);
   const SEVERITY_ORDER = ['Critical', 'Major', 'Minor'];
   /*
    * A characteristic whose severity the master does not resolve. Spec section 5
@@ -93,6 +99,7 @@
     pendingTotal: 0,
     pendingRows: [],
     pendingAllRows: [],
+    minLotQty: MIN_LOT_QTY_FALLBACK,
     pendingFrom: '',
     pendingTo: '',
     colFilters: {
@@ -887,6 +894,29 @@
     return false;
   }
 
+  /*
+   * One answer to "can this lot be inspected", asked by the queue row, by the
+   * click on its button, and again when the form opens from a pasted URL.
+   *
+   * The API decides; this only reads what it said, and falls back to the
+   * threshold when talking to an API that does not send the flag yet. A lot
+   * size of 0 is unknown, not tiny, and is never skipped on that basis.
+   */
+  function qcSkipReason(row) {
+    if (!row) return null;
+    if (row.qcSkipReason) return String(row.qcSkipReason);
+    if (row.qcRequired === false) {
+      return 'GPN quantity is ' + fmtInt(row.lotSize) + ', below the '
+        + fmtInt(state.minLotQty) + ' minimum. This lot does not need QC.';
+    }
+    const qty = Number(row.lotSize);
+    if (Number.isFinite(qty) && qty > 0 && qty < state.minLotQty) {
+      return 'GPN quantity is ' + fmtInt(qty) + ', below the '
+        + fmtInt(state.minLotQty) + ' minimum. This lot does not need QC.';
+    }
+    return null;
+  }
+
   function pendingDisplayValues(row) {
     const wait = waitingLabel(row.gpnDate);
     const reason = row.pendingReason || 'Not started';
@@ -899,11 +929,13 @@
       client: row.client || '',
       categoryName: row.categoryName || '',
       lotSize: fmtInt(row.lotSize),
-      requiredSample: fmtInt(row.requiredSample),
+      /* No sample is owed on a lot that does not need inspecting. */
+      requiredSample: qcSkipReason(row) ? '—' : fmtInt(row.requiredSample),
       status: statusWord(reason),
       waitOverShift: wait.overShift,
       reason: reason,
-      reinspect: Number(row.submissionCount) > 0
+      reinspect: Number(row.submissionCount) > 0,
+      skipReason: qcSkipReason(row)
     };
   }
 
@@ -976,6 +1008,9 @@
         pageSize: fetchSize
       }));
       const rows = data.rows || [];
+      /* The API owns the threshold; keep the browser's copy in step with it. */
+      const reportedMin = Number(data.minLotQty);
+      if (Number.isFinite(reportedMin) && reportedMin > 0) state.minLotQty = reportedMin;
       const reported = Number(data.total);
       total = Number.isFinite(reported) && reported >= 0 ? reported : all.length + rows.length;
       all.push(...rows);
@@ -1018,8 +1053,18 @@
       els.pendingBody.innerHTML = rows.map((row, idx) => {
         const d = pendingDisplayValues(row);
         const isRework = /rework|rejected/i.test(d.reason);
-        const btnLabel = d.reinspect ? 'Re-inspect' : 'Start QC';
-        const rowClass = [isRework ? 'row-rework' : '', d.waitOverShift ? 'row-overshift' : ''].filter(Boolean).join(' ');
+        const btnLabel = d.skipReason ? 'No QC needed' : (d.reinspect ? 'Re-inspect' : 'Start QC');
+        /*
+         * Not the disabled attribute: a disabled button swallows the click, and
+         * then nothing explains itself. It looks unavailable and says why when
+         * pressed, which is what someone reaching for it wants to know.
+         */
+        const btnClass = d.skipReason ? 'btn-muted' : 'btn-primary';
+        const rowClass = [
+          isRework ? 'row-rework' : '',
+          d.waitOverShift ? 'row-overshift' : '',
+          d.skipReason ? 'row-skip' : ''
+        ].filter(Boolean).join(' ');
         return (
           '<tr class="' + rowClass + '">'
           + '<td>' + escapeHtml(d.gpnNo || '—') + '</td>'
@@ -1032,7 +1077,14 @@
           + '<td class="num">' + escapeHtml(d.lotSize) + '</td>'
           + '<td class="num">' + escapeHtml(d.requiredSample) + '</td>'
           + '<td>' + pill(d.reason) + '</td>'
-          + '<td><button type="button" class="btn-primary" data-start="' + idx + '">' + escapeHtml(btnLabel) + '</button></td>'
+          + '<td><button type="button" class="' + btnClass + '" data-start="' + idx + '"'
+          /*
+           * A title, not aria-disabled. The button does respond — pressing it
+           * is how the reason appears — and aria-disabled would tell a screen
+           * reader, and anything driving the page, that it does not.
+           */
+          + (d.skipReason ? ' title="' + escapeHtml(d.skipReason) + '"' : '')
+          + '>' + escapeHtml(btnLabel) + '</button></td>'
           + '</tr>'
         );
       }).join('');
@@ -1052,6 +1104,11 @@
   }
 
   async function openForm(lot) {
+    const skip = qcSkipReason(lot);
+    if (skip) {
+      showStatus(skip, true);
+      return;
+    }
     sessionStorage.setItem(PENDING_ROW_KEY, JSON.stringify(lot));
     setHash('form', {
       jobBookingId: lot.jobBookingId,
@@ -1090,6 +1147,19 @@
 
     if (!lot.categoryId || lot.lotSize == null) {
       showFormError('This form needs categoryId and lotSize on the URL. Open it from the awaiting list.');
+      return;
+    }
+
+    /*
+     * The queue greys the button out, but the form is reachable by its URL —
+     * a bookmark, a tab left open, a link passed to a colleague. Same rule
+     * here, and the save refuses it a third time.
+     */
+    const skip = qcSkipReason(lot);
+    if (skip) {
+      showFormError(skip);
+      els.formSections.innerHTML = '';
+      els.planLotLine.textContent = '';
       return;
     }
 
@@ -1756,7 +1826,13 @@
     const btn = e.target.closest('[data-start]');
     if (!btn) return;
     const row = state.pendingRows[Number(btn.getAttribute('data-start'))];
-    if (row) openForm(row);
+    if (!row) return;
+    const skip = qcSkipReason(row);
+    if (skip) {
+      showStatus(skip, true);
+      return;
+    }
+    openForm(row);
   });
 
   els.loginDatabase.addEventListener('change', () => {

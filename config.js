@@ -24,6 +24,15 @@ window.AppConfig = window.AppConfig || {};
 })();
 
 /**
+ * A GPN below this many pieces does not need QC.
+ *
+ * The API holds the same number in FGQC_MIN_LOT_QTY and sends it with the
+ * queue, which is the one that wins — this is only the fallback for a page
+ * loaded before the API answers. Keep the two the same.
+ */
+window.AppConfig.minLotQty = window.AppConfig.minLotQty || 50;
+
+/**
  * Go-live cutoff: without this, every historical GPN appears in the queue.
  *
  * 1 September 2026 — go-live for the awaiting queue. The API keeps the same
