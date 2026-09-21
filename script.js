@@ -929,8 +929,17 @@
       client: row.client || '',
       categoryName: row.categoryName || '',
       lotSize: fmtInt(row.lotSize),
-      /* No sample is owed on a lot that does not need inspecting. */
-      requiredSample: qcSkipReason(row) ? '—' : fmtInt(row.requiredSample),
+      /*
+       * No sample is owed on a lot that does not need inspecting, and none is
+       * known when no band covers the lot. Both print as a dash.
+       *
+       * Not fmtInt alone: Number(null) is 0, so a lot the plan does not cover
+       * would read "required sample 0" — inspect nothing — rather than saying
+       * the plan has no answer for it.
+       */
+      requiredSample: (qcSkipReason(row) || row.requiredSample == null)
+        ? '—'
+        : fmtInt(row.requiredSample),
       status: statusWord(reason),
       waitOverShift: wait.overShift,
       reason: reason,
